@@ -26,6 +26,10 @@
 - 每章新增的核心教学代码尽量控制在 100–150 行；需要更多代码时拆章。
 - 测试、类型和必要注释不机械计入行数，但不能靠压缩代码规避限制。
 - 每章必须有独立的运行或测试方式。
+- 关键代码要有适当注释，优先解释边界条件和设计原因，而不是复述语法。
+- 每章必须逐段解释关键代码，说明关键状态如何变化以及代码为什么这样设计。
+- 每章必须提供一个端到端具体例子，从输入开始展示中间数据，直到最终输出或状态。
+- 每章必须提供在 Markdown 源文件中直接可读的 ASCII 图；确实不适用时要明确说明原因。
 - `labs/chapter-*` 保存章节快照，`apps/nano-pi` 保存持续演进的版本。
 - 原项目持续变化；结论必须区分“已核对源码”和“待后续章节验证”。
 
@@ -36,6 +40,7 @@ apps/
   nano-pi/          持续演进的教学 Agent
   agent-harness/    面向实际使用的增强 Agent
 packages/
+  config/           通用环境配置加载
   protocol/         Message、模型事件和 Agent 事件协议
   model-deepseek/   DeepSeek API 适配
   session/          Session 与持久化
@@ -55,22 +60,24 @@ docs/               进度、源码地图和设计决策
 - DeepSeek 作为第一个模型服务商
 - `DEEPSEEK_API_KEY` 只通过环境变量提供
 
-目前尚未安装依赖，也没有要求 API key。Chapter 1 才会建立第一个真实模型请求。
+目前没有第三方运行时依赖。只有在手动运行真实模型请求时才需要 `DEEPSEEK_API_KEY`；它可以来自 shell 环境变量或仓库根目录的 `.env`。离线测试不会消耗 API 额度。
 
 ## 当前进度
 
-当前完成 Chapter 0：项目边界、工作区骨架、学习路线和第一版源码地图。下一步是 Chapter 1：只使用 Node.js 原生能力完成一次 DeepSeek 流式请求。
+当前完成 Chapter 1：使用 Node.js 原生 `fetch`、Web Streams、可注入 Provider 和 Async Generator 完成 DeepSeek 文本流。下一步是 Chapter 2：从字符串演进出结构化 Message。
 
 新会话开始时，先阅读 [docs/progress.md](docs/progress.md)，再阅读当前章节文档。
+
+编写新章节时使用 [章节模板](docs/chapter-template.md) 作为验收清单。
 
 ## 章节路线
 
 | 章节 | 主题 | 状态 |
 | --- | --- | --- |
 | 00 | 阅读地图与最小工程 | 已完成 |
-| 01 | DeepSeek 流式请求 | 待开始 |
-| 02 | Message 与内容块 | 未开始 |
-| 03 | 统一模型事件流 | 未开始 |
+| 01 | DeepSeek 流式请求 | 已完成 |
+| 02 | Message 与内容块 | 待开始 |
+| 03 | 统一模型事件流与 Provider 演进 | 未开始 |
 | 04 | Session 与 JSONL | 未开始 |
 | 05 | Context 构建与模型转换 | 未开始 |
 | 06 | 最小 Agent Loop | 未开始 |
@@ -88,6 +95,7 @@ docs/               进度、源码地图和设计决策
 pnpm check
 pnpm test
 pnpm typecheck
+pnpm --filter @x-pi/nano-pi start -- "你好"
 ```
 
-这些命令目前只会遍历已有 workspace；随着章节推进，各包会逐步增加自己的检查和测试脚本。
+应用通过共享 `@x-pi/config` 从当前目录向上查找最近的 `.env`，因此最后一条命令可以从 monorepo 任意层级启动。也可以用 `ENV_FILE` 指定配置文件。完整讲解见 [Chapter 1](chapters/01-deepseek-stream/README.md)。

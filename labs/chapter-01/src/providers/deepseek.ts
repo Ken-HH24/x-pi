@@ -1,0 +1,34 @@
+import type { TextProvider } from "../stream.ts";
+
+type DeepSeekChunk = { choices?: Array<{ delta?: { content?: unknown } }> };
+
+export const deepSeekProvider: TextProvider = {
+  name: "deepseek",
+  url: "https://api.deepseek.com/chat/completions",
+  defaultModel: "deepseek-flash",
+  headers: (apiKey) => ({
+    "content-type": "application/json",
+    authorization: `Bearer ${apiKey}`,
+  }),
+  body: (prompt, model) => ({
+    model,
+    messages: [{ role: "user", content: prompt }],
+    stream: true,
+  }),
+  parse(data) {
+    if (data === "[DONE]") return { type: "done" };
+    let chunk: DeepSeekChunk;
+    try {
+      chunk = JSON.parse(data) as DeepSeekChunk;
+    } catch {
+      throw new Error(`Invalid DeepSeek JSON: ${data}`);
+    }
+    const content = chunk.choices?.[0]?.delta?.content;
+    // DeepSeek 的角色、结束或 reasoning 分片可能没有文本，content 会是 null。
+    if (content == null || content === "") return { type: "ignore" };
+    if (typeof content !== "string") {
+      throw new Error("Invalid DeepSeek chunk: delta.content is not text");
+    }
+    return { type: "text", text: content };
+  },
+};

@@ -1,9 +1,8 @@
 {
-  "name": "@x-pi/nano-pi",
+  "name": "@x-pi/lab-chapter-01",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The continuously evolving Nano Pi learning application.",
   "dependencies": {
     "@x-pi/config": "workspace:*"
   },

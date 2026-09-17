@@ -20,6 +20,12 @@ Pi 当前主仓库的核心 package 包括：
 
 ## 已确认的关键设计
 
+### Chapter 1：OpenAI-compatible 文本流
+
+DeepSeek 当前官方 Chat API 使用 `POST https://api.deepseek.com/chat/completions`，设置 `stream: true` 后以 SSE 返回 OpenAI-compatible chunk。Pi 将这类接口归入模型 API 层；Nano Pi 本章通过注入的 `deepSeekProvider` 解析 `choices[0].delta.content`，通用 SSE 层不依赖厂商格式，并要求 provider 产生 done 事件才视为完整结束。
+
+本章只实现最小 `TextProvider`，并未照搬 Pi 的完整模型系统。reasoning、tool calls、usage、provider registry、重试和统一 AssistantMessage 事件会等到各自问题出现时再加入。
+
 ### 模型消息与 Agent 消息分离
 
 Pi Agent 允许应用自定义 `AgentMessage`，但调用模型前必须经过 `transformContext()` 和 `convertToLlm()`，最终只发送模型理解的消息。Nano Pi 会先从少量消息类型开始，但保留“存储/应用消息不等于 provider 请求格式”这一边界。
@@ -44,7 +50,7 @@ Pi 官方说明默认继承启动进程的文件、进程、网络和凭据权�
 
 | x-pi 章节 | 重点核对的 Pi 区域 |
 | --- | --- |
-| 01–03 | `packages/ai` 的 provider、stream 与消息事件 |
+| 01–03 | `packages/ai` 的 provider/model/API 分层、stream 与消息事件 |
 | 04–05 | `packages/coding-agent` 的 session/context，以及 session format 文档 |
 | 06–08 | `packages/agent` 的 Agent、agent loop、工具执行与事件顺序 |
 | 09 | `packages/coding-agent` CLI 与 `packages/tui` |
@@ -55,7 +61,7 @@ Pi 官方说明默认继承启动进程的文件、进程、网络和凭据权�
 
 ## 尚待源码级验证
 
-- DeepSeek 在当前 Pi provider registry 中的确切接入方式与模型元数据。
+- DeepSeek 在当前 Pi provider registry 中的完整模型元数据；本章仅确认它复用 OpenAI-compatible API 路径。
 - `packages/ai/src` 中流事件和 tool-call 参数拼接的最新实现文件。
 - `packages/coding-agent/src` 中 SessionManager、compaction 和扩展加载的最新文件边界。
 - 新增 `protocol`、`client/server` 后与本地 coding-agent 的具体协作关系。
@@ -70,4 +76,4 @@ Pi 官方说明默认继承启动进程的文件、进程、网络和凭据权�
 - <https://github.com/earendil-works/pi/tree/main/packages/coding-agent>
 - <https://pi.dev/docs/latest>
 - <https://pi-from-scratch.vercel.app/>
-
+- <https://api-docs.deepseek.com/guides/reasoning_model>
