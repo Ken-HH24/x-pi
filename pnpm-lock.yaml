@@ -1,0 +1,25 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  apps/agent-harness: {}
+
+  apps/nano-pi: {}
+
+  packages/agent-runtime: {}
+
+  packages/memory: {}
+
+  packages/model-deepseek: {}
+
+  packages/protocol: {}
+
+  packages/sandbox: {}
+
+  packages/session: {}

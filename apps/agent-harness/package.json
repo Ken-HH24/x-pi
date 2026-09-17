@@ -1,0 +1,8 @@
+{
+  "name": "@x-pi/agent-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A practical agent harness built after the Nano Pi core is understood."
+}
+

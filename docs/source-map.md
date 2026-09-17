@@ -1,0 +1,73 @@
+# Pi 源码学习地图
+
+更新时间：2026-09-17。
+
+本文件不是永久正确的架构说明，而是 `x-pi` 学习过程中持续校准的索引。Pi 主仓库变化很快；进入每个章节时仍需重新核对相关源码。
+
+## 已核对的整体结构
+
+Pi 当前主仓库的核心 package 包括：
+
+| Pi package | 当前职责 | x-pi 对应位置 |
+| --- | --- | --- |
+| `packages/ai` | 多 provider 模型抽象、消息与流式响应 | `packages/model-deepseek`、`packages/protocol` |
+| `packages/agent` | Agent 状态、事件流、工具执行和循环 | `packages/agent-runtime` |
+| `packages/coding-agent` | CLI、Session、上下文、扩展和内置工具 | `apps/nano-pi`，后续部分进入 Harness |
+| `packages/tui` | 终端 UI 与差量渲染 | 前期使用极简 CLI，后期单独学习 |
+| `packages/protocol` | 跨进程协议类型 | Nano Pi 后期按需要覆盖 |
+| `packages/client` / `server` | 远程或进程外集成边界 | 暂不进入基础路线 |
+| `packages/session-backends/*` | 可替换的 Session 存储后端 | `packages/session` 后期扩展 |
+
+## 已确认的关键设计
+
+### 模型消息与 Agent 消息分离
+
+Pi Agent 允许应用自定义 `AgentMessage`，但调用模型前必须经过 `transformContext()` 和 `convertToLlm()`，最终只发送模型理解的消息。Nano Pi 会先从少量消息类型开始，但保留“存储/应用消息不等于 provider 请求格式”这一边界。
+
+### Provider 事件与 Agent 事件分离
+
+模型层负责将厂商流转换成稳定的消息增量；Agent 层再发出 `agent_start`、`turn_start`、`message_update`、工具执行和结束事件。我们会分两章实现这两层，避免 UI 直接理解 DeepSeek 的 SSE 格式。
+
+### Agent Loop 以 turn 为单位
+
+一次 turn 包含一次模型响应和由该响应触发的工具执行。存在工具结果时，Agent 会开始下一次 turn，直到模型不再请求工具或运行被终止。
+
+### Session 是树，不只是聊天数组
+
+Pi 文档明确说明 Session 使用 JSONL，并以树结构保存分支。Nano Pi 会先学习追加日志，再引入 parent 指针、分支导航和 compaction，避免第一章就承担完整复杂度。
+
+### Harness 需要自己定义安全边界
+
+Pi 官方说明默认继承启动进程的文件、进程、网络和凭据权限；严格隔离需要容器或 sandbox。这正是本仓库 Harness 路线需要补充的主要能力之一。
+
+## 章节映射
+
+| x-pi 章节 | 重点核对的 Pi 区域 |
+| --- | --- |
+| 01–03 | `packages/ai` 的 provider、stream 与消息事件 |
+| 04–05 | `packages/coding-agent` 的 session/context，以及 session format 文档 |
+| 06–08 | `packages/agent` 的 Agent、agent loop、工具执行与事件顺序 |
+| 09 | `packages/coding-agent` CLI 与 `packages/tui` |
+| 10 | SessionManager、JSONL entry 与 tree navigation |
+| 11 | compaction 与 branch summarization |
+| 12 | extensions、events、skills 与动态 context |
+| 13 | 全链路差异复盘 |
+
+## 尚待源码级验证
+
+- DeepSeek 在当前 Pi provider registry 中的确切接入方式与模型元数据。
+- `packages/ai/src` 中流事件和 tool-call 参数拼接的最新实现文件。
+- `packages/coding-agent/src` 中 SessionManager、compaction 和扩展加载的最新文件边界。
+- 新增 `protocol`、`client/server` 后与本地 coding-agent 的具体协作关系。
+
+这些内容会在对应章节开始前核对并写入本文件，不在 Chapter 0 中提前下结论。
+
+## 参考链接
+
+- <https://github.com/earendil-works/pi>
+- <https://github.com/earendil-works/pi/tree/main/packages/ai>
+- <https://github.com/earendil-works/pi/tree/main/packages/agent>
+- <https://github.com/earendil-works/pi/tree/main/packages/coding-agent>
+- <https://pi.dev/docs/latest>
+- <https://pi-from-scratch.vercel.app/>
+
