@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node src/main.ts",
     "check": "node --test test/*.test.ts",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
   }
 }

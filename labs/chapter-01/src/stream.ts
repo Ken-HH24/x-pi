@@ -12,8 +12,8 @@ export type TextProvider = {
 
 type StreamOptions = {
   apiKey: string;
-  model?: string;
-  signal?: AbortSignal;
+  model?: string | undefined;
+  signal?: AbortSignal | undefined;
   fetch?: typeof globalThis.fetch;
 };
 
@@ -61,7 +61,7 @@ export async function* streamText(
     method: "POST",
     headers: provider.headers(options.apiKey),
     body: JSON.stringify(provider.body(prompt, model)),
-    signal: options.signal,
+    signal: options.signal ?? null,
   });
 
   if (!response.ok) {
