@@ -2,7 +2,7 @@
 import { getCollection } from "astro:content";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { chapterHref, chapterNumber, sortedChapters } from "@/lib/chapters";
-import { roadmap } from "@/data/roadmap";
+import { roadmap, roadmapGroups } from "@/data/roadmap";
 
 const chapters = sortedChapters(await getCollection("chapters"));
 const byOrder = new Map(chapters.map((chapter) => [chapter.data.order, chapter]));
@@ -21,7 +21,7 @@ const nextOrder = chapters.length;
         <div class="progress-meta"><span>当前进度</span><strong>{chapters.length} / {roadmap.length}</strong></div>
         <div class="progress-track"><span style={`width: ${(chapters.length / roadmap.length) * 100}%`}></span></div>
         <p>下一章</p>
-        <strong>03 · {roadmap[nextOrder]}</strong>
+        <strong>c03 · {roadmap[nextOrder].shortTitle}</strong>
       </div>
     </section>
 
@@ -30,25 +30,33 @@ const nextOrder = chapters.length;
         <div><span class="eyebrow">CURRICULUM</span><h2 id="route-title">章节路线</h2></div>
         <p>完成的章节可以直接阅读；后续章节会沿同一条数据流逐步解锁。</p>
       </div>
-      <ol class="route-list">
-        {roadmap.map((title, order) => {
-          const chapter = byOrder.get(order);
-          const isNext = order === nextOrder;
-          const content = (
-            <>
-              <span class="route-number">{chapterNumber(order)}</span>
-              <span class="route-copy">
-                <strong>{title}</strong>
-                <small>{chapter?.data.summary ?? (isNext ? "下一步：把文本增量提升为稳定的模型事件。" : "等待前置章节完成后开始。")}</small>
-              </span>
-              <span class:list={["route-status", chapter ? "done" : isNext ? "next" : "locked"]}>
-                {chapter ? "阅读 →" : isNext ? "下一章" : "待开始"}
-              </span>
-            </>
-          );
-          return <li>{chapter ? <a href={chapterHref(chapter)}>{content}</a> : <div>{content}</div>}</li>;
-        })}
-      </ol>
+      <div class="curriculum-groups">
+        {roadmapGroups.map((group) => (
+          <section class="curriculum-group">
+            <header><span class:list={["group-dot", group.color]}></span><h3>{group.title}</h3><small>{group.range.length} 章</small></header>
+            <ol class="route-list">
+              {group.range.map((order) => {
+                const item = roadmap[order];
+                const chapter = byOrder.get(order);
+                const isNext = order === nextOrder;
+                const content = (
+                  <>
+                    <span class="route-number">c{chapterNumber(order)}</span>
+                    <span class="route-copy">
+                      <strong>{item.shortTitle}</strong>
+                      <small>{chapter?.data.summary ?? item.title}</small>
+                    </span>
+                    <span class:list={["route-status", chapter ? "done" : isNext ? "next" : "locked"]}>
+                      {chapter ? "阅读 →" : isNext ? "下一章" : "待开始"}
+                    </span>
+                  </>
+                );
+                return <li>{chapter ? <a href={chapterHref(chapter)}>{content}</a> : <div>{content}</div>}</li>;
+              })}
+            </ol>
+          </section>
+        ))}
+      </div>
     </section>
 
     <section class="reading-principles">

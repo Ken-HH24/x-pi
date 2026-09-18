@@ -8,6 +8,7 @@
 - [PI from Scratch](https://pi-from-scratch.vercel.app/)：按数据流理解最小实现。
 - [π-agent book](https://books.antinomie.org/pi/)：补充讲解材料。
 - [pi.dev](https://pi.dev/)：官方功能与概念文档。
+- [Learn Claude Code](https://learn.shareai.run/zh/s01/)：参考渐进式章节组织、能力分层与版本对比体验。
 
 ## 两条路线
 

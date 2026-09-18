@@ -1,6 +1,6 @@
 # x-pi 学习网站
 
-这是 `chapters/*/README.md` 的定制阅读界面。正文仍在章节目录维护，网站只负责导航、搜索、排版和相邻 lab 快照的关键代码 Diff。
+这是 `chapters/*/README.md` 的定制阅读界面。正文仍在章节目录维护，网站负责按能力层组织课程、搜索、版本对比、架构导航，以及相邻 lab 快照的关键代码 Diff。章节体验参考 [Learn Claude Code](https://learn.shareai.run/zh/s01/) 的渐进式组织方式。
 
 ```bash
 pnpm docs:dev

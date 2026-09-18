@@ -82,4 +82,5 @@ Pi 官方说明默认继承启动进程的文件、进程、网络和凭据权�
 - <https://github.com/earendil-works/pi/tree/main/packages/coding-agent>
 - <https://pi.dev/docs/latest>
 - <https://pi-from-scratch.vercel.app/>
+- <https://learn.shareai.run/zh/s01/>
 - <https://api-docs.deepseek.com/guides/reasoning_model>

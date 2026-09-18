@@ -1,0 +1,44 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { chapterHref, chapterNumber, sortedChapters } from "@/lib/chapters";
+import { roadmap, roadmapGroups } from "@/data/roadmap";
+
+const chapters = sortedChapters(await getCollection("chapters"));
+const chapterByOrder = new Map(chapters.map((chapter) => [chapter.data.order, chapter]));
+const descriptions = {
+  protocol: "把厂商请求与响应转换成稳定的消息和模型事件，是整个 Agent 的数据入口。",
+  context: "保存对话历史，并在每次模型调用前构造恰当、可恢复的上下文。",
+  agent: "驱动模型与工具之间的循环，让一次回答演进成能够采取行动的 Agent。",
+  interface: "处理终端交互、取消、分支、压缩和生命周期，使核心能力可以长期使用。",
+  review: "回到 Pi 源码核对边界、事件顺序和教学实现中的刻意简化。",
+} as const;
+---
+
+<BaseLayout title="架构层" description="查看 x-pi 各能力层如何沿数据流逐步组合。">
+  <div class="utility-page">
+    <header class="utility-hero">
+      <span class="eyebrow">ARCHITECTURE LAYERS</span>
+      <h1>不是功能清单，而是一条数据流</h1>
+      <p>从模型协议开始，逐层加入上下文、工具循环和应用能力。每一层都由前一层的具体限制推动。</p>
+    </header>
+    <div class="layer-stack">
+      {roadmapGroups.map((group, index) => (
+        <section class="layer-card">
+          <div class="layer-index">L{index + 1}</div>
+          <div class="layer-copy">
+            <div class="layer-title"><span class:list={["group-dot", group.color]}></span><h2>{group.title}</h2></div>
+            <p>{descriptions[group.id]}</p>
+          </div>
+          <ol>
+            {group.range.map((order) => {
+              const chapter = chapterByOrder.get(order);
+              const label = <><code>c{chapterNumber(order)}</code><span>{roadmap[order].shortTitle}</span></>;
+              return <li>{chapter ? <a href={chapterHref(chapter)}>{label}</a> : <span>{label}</span>}</li>;
+            })}
+          </ol>
+        </section>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

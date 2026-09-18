@@ -5,6 +5,7 @@ import ChapterDelta from "@/components/ChapterDelta.astro";
 import CodeDiff from "@/components/CodeDiff.astro";
 import { chapterHref, chapterNumber, sortedChapters } from "@/lib/chapters";
 import { createFileDiffs } from "@/lib/diff";
+import { groupForChapter, roadmap } from "@/data/roadmap";
 
 export async function getStaticPaths() {
   const chapters = await getCollection("chapters");
@@ -25,6 +26,10 @@ const previous = allChapters[index - 1];
 const next = allChapters[index + 1];
 const { Content, headings } = await render(chapter);
 const diffs = await createFileDiffs(chapter.data.diffFrom, chapter.data.lab, chapter.data.diffFiles);
+const group = groupForChapter(chapter.data.order);
+const roadmapItem = roadmap[chapter.data.order];
+const changedLines = diffs.reduce((total, file) => total + file.additions + file.deletions, 0);
+const githubBase = "https://github.com/Ken-HH24/x-pi/tree/main";
 ---
 
 <BaseLayout
@@ -35,30 +40,61 @@ const diffs = await createFileDiffs(chapter.data.diffFrom, chapter.data.lab, cha
 >
   <article class="chapter-page">
     <header class="chapter-hero">
-      <div class="chapter-kicker">
-        <span>CHAPTER {chapterNumber(chapter.data.order)}</span>
-        <span class="status-chip">已完成</span>
+      <div class="chapter-title-row">
+        <span class="chapter-code">c{chapterNumber(chapter.data.order)}</span>
+        <h1>{roadmapItem.shortTitle}</h1>
+        <span class:list={["category-chip", group.color]}>{group.title}</span>
       </div>
-      <h1>{chapter.data.title}</h1>
-      <p>{chapter.data.summary}</p>
+      <p>{chapter.data.title} · {chapter.data.summary}</p>
       <div class="chapter-meta">
-        <span>{chapter.data.delta.concepts.length} 个新概念</span>
-        <span>{chapter.data.diffFiles.length} 个关键 Diff</span>
-        {chapter.data.lab && <code>labs/{chapter.data.lab}</code>}
+        <span class="mono">{changedLines} changed LOC</span>
+        <span>{chapter.data.delta.concepts.length} 个核心概念</span>
+        {chapter.data.lab && <span class="meta-tag">labs/{chapter.data.lab}</span>}
       </div>
+      <blockquote>{chapter.data.summary}</blockquote>
     </header>
 
-    <ChapterDelta order={chapter.data.order} delta={chapter.data.delta} />
-
-    <div class="prose">
-      <Content />
+    <div class="chapter-tabs" role="tablist" aria-label="章节内容">
+      <button class="active" type="button" role="tab" aria-selected="true" data-tab="learn">学习</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="delta">本章增量</button>
+      {diffs.length > 0 && <button type="button" role="tab" aria-selected="false" data-tab="diff">关键 Diff</button>}
+      <button type="button" role="tab" aria-selected="false" data-tab="source">源码与运行</button>
     </div>
 
-    <CodeDiff
-      diffs={diffs}
-      fromLabel={chapter.data.diffFrom ? `labs/${chapter.data.diffFrom}` : "空实现"}
-      toLabel={chapter.data.lab ? `labs/${chapter.data.lab}` : "本章"}
-    />
+    <div class="tab-panel active" data-panel="learn" role="tabpanel">
+      <div class="prose"><Content /></div>
+    </div>
+
+    <div class="tab-panel" data-panel="delta" role="tabpanel" hidden>
+      <ChapterDelta order={chapter.data.order} delta={chapter.data.delta} />
+    </div>
+
+    {diffs.length > 0 && (
+      <div class="tab-panel" data-panel="diff" role="tabpanel" hidden>
+        <CodeDiff
+          diffs={diffs}
+          fromLabel={chapter.data.diffFrom ? `labs/${chapter.data.diffFrom}` : "空实现"}
+          toLabel={chapter.data.lab ? `labs/${chapter.data.lab}` : "本章"}
+        />
+      </div>
+    )}
+
+    <div class="tab-panel" data-panel="source" role="tabpanel" hidden>
+      <section class="source-panel">
+        <div><span class="eyebrow">RUNNABLE SNAPSHOT</span><h2>源码与运行</h2></div>
+        {chapter.data.lab ? (
+          <>
+            <p>本章代码保存在独立快照中，不会随 Nano Pi 后续章节继续变化。</p>
+            <a class="source-link" href={`${githubBase}/labs/${chapter.data.lab}`} target="_blank" rel="noreferrer">
+              <code>labs/{chapter.data.lab}</code><span>在 GitHub 查看 →</span>
+            </a>
+            <pre><code>{`pnpm --filter @x-pi/lab-${chapter.data.lab} test\npnpm --filter @x-pi/lab-${chapter.data.lab} start -- "你好"`}</code></pre>
+          </>
+        ) : (
+          <p>Chapter 0 只建立工程地图和学习约束，因此没有代码快照。</p>
+        )}
+      </section>
+    </div>
 
     <nav class="chapter-pagination" aria-label="章节翻页">
       {previous ? (
@@ -71,4 +107,24 @@ const diffs = await createFileDiffs(chapter.data.diffFrom, chapter.data.lab, cha
       )}
     </nav>
   </article>
+  <script>
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>("[data-tab]")];
+    const panels = [...document.querySelectorAll<HTMLElement>("[data-panel]")];
+    const selectTab = (name: string, updateHash = true) => {
+      if (!tabs.some((tab) => tab.dataset.tab === name)) name = "learn";
+      tabs.forEach((tab) => {
+        const active = tab.dataset.tab === name;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+      panels.forEach((panel) => {
+        const active = panel.dataset.panel === name;
+        panel.hidden = !active;
+        panel.classList.toggle("active", active);
+      });
+      if (updateHash) history.replaceState(null, "", name === "learn" ? location.pathname : `#${name}`);
+    };
+    tabs.forEach((tab) => tab.addEventListener("click", () => selectTab(tab.dataset.tab ?? "learn")));
+    if (["delta", "diff", "source"].includes(location.hash.slice(1))) selectTab(location.hash.slice(1), false);
+  </script>
 </BaseLayout>
