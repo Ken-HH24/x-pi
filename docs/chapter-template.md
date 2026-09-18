@@ -2,6 +2,31 @@
 
 每个新章节复制并按实际主题调整本结构。章节完成前逐项检查末尾验收清单。
 
+章节文件顶部必须提供网站元数据：
+
+```yaml
+---
+order: 3
+slug: model-events
+title: 统一模型事件流
+summary: 一句话说明本章得到的能力。
+status: current
+lab: chapter-03
+diffFrom: chapter-02
+delta:
+  concepts:
+    - 新增的核心概念
+  behaviors:
+    - 相比上一章可观察到的行为变化
+  files:
+    - 关键文件及职责
+diffFiles:
+  - src/example.ts
+---
+```
+
+`diffFiles` 只列最能说明本章变化的文件。学习网站会从相邻 lab 快照生成真实 diff，不要为了完整而把所有测试和夹具都加入。
+
 ## 一两句话总结
 
 用一两句话说明本章解决的问题，以及完成后系统新增了什么能力。

@@ -1,3 +1,25 @@
+---
+order: 1
+slug: deepseek-stream
+title: 第一次 DeepSeek 流式请求
+summary: 用原生 fetch、Web Streams 与可注入 Provider 正确消费 DeepSeek SSE 文本流。
+status: completed
+lab: chapter-01
+delta:
+  concepts:
+    - SSE 事件边界与网络分片并不相同
+    - Provider 隔离通用流处理与厂商协议
+  behaviors:
+    - 回答生成时逐块输出到终端
+    - 支持 HTTP 错误、截断检测与 Ctrl+C 取消
+  files:
+    - src/stream.ts：HTTP、SSE 与 Async Generator
+    - src/providers/deepseek.ts：DeepSeek 请求和响应转换
+diffFiles:
+  - src/stream.ts
+  - src/providers/deepseek.ts
+---
+
 # Chapter 1：第一次 DeepSeek 流式请求
 
 ## 一句话总结

@@ -1,0 +1,37 @@
+---
+interface Props {
+  order: number;
+  delta: {
+    concepts: string[];
+    behaviors: string[];
+    files: string[];
+  };
+}
+
+const { order, delta } = Astro.props;
+const groups = [
+  { label: "新增概念", marker: "01", items: delta.concepts },
+  { label: "行为变化", marker: "02", items: delta.behaviors },
+  { label: "关键文件", marker: "03", items: delta.files },
+];
+---
+
+<section class="delta-panel" aria-labelledby="delta-title">
+  <div class="delta-heading">
+    <div>
+      <span class="eyebrow">CHAPTER DELTA</span>
+      <h2 id="delta-title">{order === 0 ? "这一章建立什么" : "相比上一章"}</h2>
+    </div>
+    <span class="delta-badge">+{delta.concepts.length + delta.behaviors.length}</span>
+  </div>
+  <div class="delta-grid">
+    {groups.map((group) => (
+      <article>
+        <div class="delta-label"><span>{group.marker}</span>{group.label}</div>
+        <ul>
+          {group.items.map((item) => <li>{item}</li>)}
+        </ul>
+      </article>
+    ))}
+  </div>
+</section>

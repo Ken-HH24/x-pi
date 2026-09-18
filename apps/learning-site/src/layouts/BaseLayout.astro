@@ -1,0 +1,122 @@
+---
+import { getCollection } from "astro:content";
+import Search from "@/components/Search.astro";
+import Sidebar from "@/components/Sidebar.astro";
+import { sortedChapters } from "@/lib/chapters";
+import "@/styles/global.css";
+
+interface Props {
+  title: string;
+  description: string;
+  currentOrder?: number;
+  headings?: Array<{ depth: number; slug: string; text: string }>;
+}
+
+const { title, description, currentOrder, headings = [] } = Astro.props;
+const chapters = sortedChapters(await getCollection("chapters"));
+const base = import.meta.env.BASE_URL;
+const baseRoot = base.replace(/\/?$/, "/");
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#07111f" />
+    <link rel="icon" href={`${baseRoot}favicon.svg`} type="image/svg+xml" />
+    <title>{title} · x-pi</title>
+    <script is:inline>
+      const savedTheme = localStorage.getItem("x-pi-theme");
+      const prefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = savedTheme || (prefersDark ? "dark" : "light");
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href={baseRoot} aria-label="x-pi 学习首页">
+        <span class="brand-mark">π</span>
+        <span><strong>x-pi</strong><small>从数据流开始理解 Agent</small></span>
+      </a>
+      <div class="header-actions">
+        <Search />
+        <a class="github-link" href="https://github.com/Ken-HH24/x-pi" target="_blank" rel="noreferrer">GitHub</a>
+        <button class="icon-button" type="button" data-theme-toggle aria-label="切换亮色或暗色主题">◐</button>
+        <button class="icon-button mobile-menu" type="button" data-menu-toggle aria-label="打开章节导航">☰</button>
+      </div>
+    </header>
+    {headings.length > 0 && <div class="reading-progress" aria-hidden="true"><span data-reading-progress></span></div>}
+    <div class="page-shell">
+      <Sidebar chapters={chapters} currentOrder={currentOrder} />
+      <main class="main-content">
+        <slot />
+      </main>
+      {headings.length > 0 && (
+        <aside class="toc" aria-label="本页目录">
+          <span class="toc-title">本页目录</span>
+          <nav>
+            {headings.filter((heading) => heading.depth <= 3).map((heading) => (
+              <a class:list={[`depth-${heading.depth}`]} href={`#${heading.slug}`}>{heading.text}</a>
+            ))}
+          </nav>
+        </aside>
+      )}
+    </div>
+    <div class="menu-backdrop" data-menu-backdrop></div>
+    <script>
+      const themeButton = document.querySelector<HTMLButtonElement>("[data-theme-toggle]");
+      themeButton?.addEventListener("click", () => {
+        const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem("x-pi-theme", next);
+      });
+
+      const menuButton = document.querySelector<HTMLButtonElement>("[data-menu-toggle]");
+      const sidebar = document.querySelector<HTMLElement>("[data-sidebar]");
+      const backdrop = document.querySelector<HTMLElement>("[data-menu-backdrop]");
+      const toggleMenu = (open: boolean) => {
+        sidebar?.classList.toggle("open", open);
+        backdrop?.classList.toggle("open", open);
+        document.body.classList.toggle("menu-open", open);
+      };
+      menuButton?.addEventListener("click", () => toggleMenu(!sidebar?.classList.contains("open")));
+      backdrop?.addEventListener("click", () => toggleMenu(false));
+
+      const progress = document.querySelector<HTMLElement>("[data-reading-progress]");
+      const updateProgress = () => {
+        if (!progress) return;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        progress.style.width = `${max > 0 ? Math.min(100, (window.scrollY / max) * 100) : 0}%`;
+      };
+      updateProgress();
+      window.addEventListener("scroll", updateProgress, { passive: true });
+
+      const tocLinks = [...document.querySelectorAll<HTMLAnchorElement>(".toc a")];
+      const observedHeadings = tocLinks
+        .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
+        .filter((heading): heading is HTMLElement => Boolean(heading));
+      const observer = new IntersectionObserver((entries) => {
+        const visible = entries.find((entry) => entry.isIntersecting);
+        if (!visible) return;
+        tocLinks.forEach((link) => link.classList.toggle("active", link.hash === `#${visible.target.id}`));
+      }, { rootMargin: "-18% 0px -72%" });
+      observedHeadings.forEach((heading) => observer.observe(heading));
+
+      document.querySelectorAll<HTMLElement>(".prose pre").forEach((pre) => {
+        const code = pre.querySelector("code")?.textContent ?? "";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "copy-code";
+        button.textContent = "复制";
+        button.setAttribute("aria-label", "复制代码");
+        button.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(code);
+          button.textContent = "已复制";
+          window.setTimeout(() => { button.textContent = "复制"; }, 1400);
+        });
+        pre.append(button);
+      });
+    </script>
+  </body>
+</html>

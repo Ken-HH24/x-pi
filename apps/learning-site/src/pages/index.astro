@@ -1,0 +1,64 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { chapterHref, chapterNumber, sortedChapters } from "@/lib/chapters";
+import { roadmap } from "@/data/roadmap";
+
+const chapters = sortedChapters(await getCollection("chapters"));
+const byOrder = new Map(chapters.map((chapter) => [chapter.data.order, chapter]));
+const nextOrder = chapters.length;
+---
+
+<BaseLayout title="学习路线" description="沿真实数据流从零理解 Pi，再构建可用的 Agent harness。">
+  <div class="home-page">
+    <section class="home-intro">
+      <div>
+        <span class="eyebrow">LEARN PI FROM THE DATA FLOW</span>
+        <h1>从一次模型请求开始，<br /><em>逐层构建 Agent。</em></h1>
+        <p>每章只引入一个新问题。先看数据如何变化，再理解抽象为什么出现，并用可运行的 lab 快照保留每一步。</p>
+      </div>
+      <div class="progress-card">
+        <div class="progress-meta"><span>当前进度</span><strong>{chapters.length} / {roadmap.length}</strong></div>
+        <div class="progress-track"><span style={`width: ${(chapters.length / roadmap.length) * 100}%`}></span></div>
+        <p>下一章</p>
+        <strong>03 · {roadmap[nextOrder]}</strong>
+      </div>
+    </section>
+
+    <section class="route-section" aria-labelledby="route-title">
+      <div class="section-heading">
+        <div><span class="eyebrow">CURRICULUM</span><h2 id="route-title">章节路线</h2></div>
+        <p>完成的章节可以直接阅读；后续章节会沿同一条数据流逐步解锁。</p>
+      </div>
+      <ol class="route-list">
+        {roadmap.map((title, order) => {
+          const chapter = byOrder.get(order);
+          const isNext = order === nextOrder;
+          const content = (
+            <>
+              <span class="route-number">{chapterNumber(order)}</span>
+              <span class="route-copy">
+                <strong>{title}</strong>
+                <small>{chapter?.data.summary ?? (isNext ? "下一步：把文本增量提升为稳定的模型事件。" : "等待前置章节完成后开始。")}</small>
+              </span>
+              <span class:list={["route-status", chapter ? "done" : isNext ? "next" : "locked"]}>
+                {chapter ? "阅读 →" : isNext ? "下一章" : "待开始"}
+              </span>
+            </>
+          );
+          return <li>{chapter ? <a href={chapterHref(chapter)}>{content}</a> : <div>{content}</div>}</li>;
+        })}
+      </ol>
+    </section>
+
+    <section class="reading-principles">
+      <span class="eyebrow">HOW TO READ</span>
+      <h2>每章都回答三个问题</h2>
+      <div>
+        <article><b>01</b><h3>为什么变化</h3><p>从上一章的具体限制出发，不先堆叠抽象。</p></article>
+        <article><b>02</b><h3>数据如何流动</h3><p>用对象、状态和 ASCII 图追踪输入到输出。</p></article>
+        <article><b>03</b><h3>代码增加什么</h3><p>查看人工摘要和相邻 lab 的关键真实 Diff。</p></article>
+      </div>
+    </section>
+  </div>
+</BaseLayout>

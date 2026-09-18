@@ -1,0 +1,49 @@
+---
+import type { FileDiff } from "@/lib/diff";
+
+interface Props {
+  diffs: FileDiff[];
+  fromLabel?: string;
+  toLabel?: string;
+}
+
+const { diffs, fromLabel = "空实现", toLabel = "本章快照" } = Astro.props;
+---
+
+{diffs.length > 0 && (
+  <section class="code-diffs" aria-labelledby="diff-title">
+    <div class="diff-section-heading">
+      <div>
+        <span class="eyebrow">REAL CODE DIFF</span>
+        <h2 id="diff-title">关键代码增量</h2>
+      </div>
+      <p>{fromLabel} → {toLabel}</p>
+    </div>
+    <p class="diff-intro">只列出最能说明本章设计变化的文件；内容直接来自相邻 lab 快照。</p>
+    <div class="diff-list">
+      {diffs.map((file, index) => (
+        <details class="diff-file" open={index === 0}>
+          <summary>
+            <code>{file.path}</code>
+            <span class="diff-stats"><b>+{file.additions}</b><i>-{file.deletions}</i></span>
+          </summary>
+          <div class="diff-scroll" tabindex="0" aria-label={`${file.path} 代码差异`}>
+            {file.hunks.map((hunk) => (
+              <div class="diff-hunk">
+                <div class="hunk-header">{hunk.header}</div>
+                {hunk.rows.map((row) => (
+                  <div class:list={["diff-row", row.kind]}>
+                    <span class="line-number">{row.oldLine ?? ""}</span>
+                    <span class="line-number">{row.newLine ?? ""}</span>
+                    <span class="line-prefix" aria-hidden="true">{row.kind === "add" ? "+" : row.kind === "remove" ? "−" : " "}</span>
+                    <code>{row.text || " "}</code>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </details>
+      ))}
+    </div>
+  </section>
+)}

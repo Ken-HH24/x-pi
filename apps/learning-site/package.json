@@ -1,0 +1,22 @@
+{
+  "name": "@x-pi/learning-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-content": "node scripts/sync-content.mjs",
+    "dev": "pnpm sync-content && astro dev",
+    "build": "pnpm sync-content && astro check && astro build",
+    "preview": "astro preview",
+    "typecheck": "pnpm sync-content && astro check"
+  },
+  "dependencies": {
+    "astro": "^5.13.0",
+    "diff": "^8.0.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

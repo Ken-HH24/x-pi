@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 02-message
+current_chapter: 03-model-events
 status: ready
-last_completed: 01-deepseek-stream
-next_action: 从真实 DeepSeek 请求和响应中提取最小 Message 与 content block
+last_completed: 02-message
+next_action: 用统一模型事件替代裸字符串增量，并核对 Pi 当前 provider/model/API 边界
 runtime:
   node: 24.18.1
   pnpm: 11.18.0
@@ -34,21 +34,25 @@ decisions:
 - [x] 添加 5 个不消耗 API 额度的离线测试。
 - [x] 保存 Chapter 1 独立代码快照。
 - [x] 完成包含流程图、逐段代码解释和完整演算的 Chapter 1 教程。
+- [x] 定义最小 user/assistant Message 和文本 content block。
+- [x] 在 DeepSeek provider 边界将应用 Message 转成模型请求。
+- [x] 保留流式输出，并把文本增量积累成完整 assistant Message。
+- [x] 添加 Chapter 2 端到端离线测试与独立代码快照。
+- [x] 完成 Chapter 2 的数据流图、关键代码解释和完整演算。
+- [x] 建立定制章节学习网站、章节搜索与关键 lab Diff。
+- [x] 配置真实 TypeScript typecheck 和 Node.js 类型。
 
 ## 下一步验收条件
 
-Chapter 2 只有满足以下条件才算完成：
+Chapter 3 只有满足以下条件才算完成：
 
-- [ ] 用一两个具体对象解释字符串为什么不足以保存对话。
-- [ ] 提供 Message 从用户输入到模型请求再到 assistant Message 的端到端演算。
-- [ ] 提供 Message 转换和流式积累的 ASCII 数据流图。
-- [ ] 逐段解释新增关键代码及其设计原因。
-- [ ] 定义最小的 user/assistant Message 和文本 content block。
-- [ ] 将请求构造从裸 prompt 改为 Message 转换。
-- [ ] 将流式文本积累成可保存的 assistant Message。
-- [ ] 保持 Chapter 1 的流式体验和错误处理。
+- [ ] 核对 Pi 当前 `packages/ai` 的 provider、model、API 与流事件实现。
+- [ ] 用具体事件解释裸字符串增量无法表达的状态。
+- [ ] 定义最小、与厂商无关的模型事件流。
+- [ ] 用事件驱动 assistant Message 的增量构建与终端输出。
+- [ ] 保持 Message 转换、SSE 完整性、错误与取消语义。
 - [ ] 核心新增教学代码不超过约 150 行。
-- [ ] 添加离线测试并保存 Chapter 2 快照。
+- [ ] 添加离线测试、完整讲解和 Chapter 3 快照。
 
 ## 暂不处理
 

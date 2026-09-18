@@ -1,0 +1,16 @@
+export const roadmap = [
+  "阅读地图与最小工程",
+  "DeepSeek 流式请求",
+  "Message 与内容块",
+  "统一模型事件流与 Provider 演进",
+  "Session 与 JSONL",
+  "Context 构建与模型转换",
+  "最小 Agent Loop",
+  "Tool Calling 协议",
+  "多轮工具循环",
+  "CLI、取消与恢复",
+  "Session Tree 与分支",
+  "Compaction",
+  "Extension 与生命周期事件",
+  "对照 Pi 源码复盘",
+] as const;

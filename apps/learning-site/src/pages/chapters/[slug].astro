@@ -1,0 +1,74 @@
+---
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import ChapterDelta from "@/components/ChapterDelta.astro";
+import CodeDiff from "@/components/CodeDiff.astro";
+import { chapterHref, chapterNumber, sortedChapters } from "@/lib/chapters";
+import { createFileDiffs } from "@/lib/diff";
+
+export async function getStaticPaths() {
+  const chapters = await getCollection("chapters");
+  return chapters.map((chapter) => ({
+    params: { slug: chapter.data.slug },
+    props: { chapter },
+  }));
+}
+
+interface Props {
+  chapter: CollectionEntry<"chapters">;
+}
+
+const { chapter } = Astro.props;
+const allChapters = sortedChapters(await getCollection("chapters"));
+const index = allChapters.findIndex((item) => item.id === chapter.id);
+const previous = allChapters[index - 1];
+const next = allChapters[index + 1];
+const { Content, headings } = await render(chapter);
+const diffs = await createFileDiffs(chapter.data.diffFrom, chapter.data.lab, chapter.data.diffFiles);
+---
+
+<BaseLayout
+  title={`Chapter ${chapterNumber(chapter.data.order)} · ${chapter.data.title}`}
+  description={chapter.data.summary}
+  currentOrder={chapter.data.order}
+  headings={headings}
+>
+  <article class="chapter-page">
+    <header class="chapter-hero">
+      <div class="chapter-kicker">
+        <span>CHAPTER {chapterNumber(chapter.data.order)}</span>
+        <span class="status-chip">已完成</span>
+      </div>
+      <h1>{chapter.data.title}</h1>
+      <p>{chapter.data.summary}</p>
+      <div class="chapter-meta">
+        <span>{chapter.data.delta.concepts.length} 个新概念</span>
+        <span>{chapter.data.diffFiles.length} 个关键 Diff</span>
+        {chapter.data.lab && <code>labs/{chapter.data.lab}</code>}
+      </div>
+    </header>
+
+    <ChapterDelta order={chapter.data.order} delta={chapter.data.delta} />
+
+    <div class="prose">
+      <Content />
+    </div>
+
+    <CodeDiff
+      diffs={diffs}
+      fromLabel={chapter.data.diffFrom ? `labs/${chapter.data.diffFrom}` : "空实现"}
+      toLabel={chapter.data.lab ? `labs/${chapter.data.lab}` : "本章"}
+    />
+
+    <nav class="chapter-pagination" aria-label="章节翻页">
+      {previous ? (
+        <a href={chapterHref(previous)}><small>上一章</small><strong>← {chapterNumber(previous.data.order)} · {previous.data.title}</strong></a>
+      ) : <span></span>}
+      {next ? (
+        <a class="next" href={chapterHref(next)}><small>下一章</small><strong>{chapterNumber(next.data.order)} · {next.data.title} →</strong></a>
+      ) : (
+        <div class="next upcoming-page"><small>下一章</small><strong>03 · 统一模型事件流</strong></div>
+      )}
+    </nav>
+  </article>
+</BaseLayout>

@@ -10,6 +10,13 @@
   "scripts": {
     "check": "pnpm -r --if-present check",
     "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "docs:dev": "pnpm --filter @x-pi/learning-site dev",
+    "docs:build": "pnpm --filter @x-pi/learning-site build",
+    "docs:preview": "pnpm --filter @x-pi/learning-site preview"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
   }
 }

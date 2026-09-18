@@ -59,3 +59,15 @@ Chapter 1 直接理解 HTTP 与 SSE，不先引入 OpenAI SDK。模型适配层�
 状态：已接受。
 
 所有应用通过 `@x-pi/config/register` 加载配置，不硬编码 `../../.env`，也不在根脚本中为每个应用建立专用命令。配置包从当前目录向上查找最近的 `.env`，并支持用 `ENV_FILE` 显式指定文件；同一机制可供任意后续应用复用。
+
+## D-011：应用 Message 使用带类型的内容块
+
+状态：已接受。
+
+Nano Pi 从 Chapter 2 起使用带角色的 Message 和 `content` 数组，不把裸字符串或厂商请求对象作为应用历史。当前只有 text block；在 provider 边界才转换成 DeepSeek 接受的字符串 content。这样后续新增 reasoning、tool call 或其他 provider 时不需要改写已有历史的基本边界。
+
+## D-012：章节网站以 Markdown 和 lab 快照为单一来源
+
+状态：已接受。
+
+定制 Astro 网站不复制教学正文：构建前从 `chapters/*/README.md` 生成内容集合，并依据章节 frontmatter 中的 `diffFiles` 对比相邻 `labs/chapter-*`。每章同时提供人工整理的概念、行为和文件增量，以及少量关键文件的真实 Diff；不展示整仓噪声差异。

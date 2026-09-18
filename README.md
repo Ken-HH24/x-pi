@@ -39,6 +39,7 @@
 apps/
   nano-pi/          持续演进的教学 Agent
   agent-harness/    面向实际使用的增强 Agent
+  learning-site/    章节学习网站与关键代码 Diff
 packages/
   config/           通用环境配置加载
   protocol/         Message、模型事件和 Agent 事件协议
@@ -64,7 +65,7 @@ docs/               进度、源码地图和设计决策
 
 ## 当前进度
 
-当前完成 Chapter 1：使用 Node.js 原生 `fetch`、Web Streams、可注入 Provider 和 Async Generator 完成 DeepSeek 文本流。下一步是 Chapter 2：从字符串演进出结构化 Message。
+当前完成 Chapter 2：用带角色的 Message 和文本 content block 表示对话，在 provider 边界转换请求，并把流式响应积累成 assistant Message。下一步是 Chapter 3：用统一模型事件表达生成过程。
 
 新会话开始时，先阅读 [docs/progress.md](docs/progress.md)，再阅读当前章节文档。
 
@@ -76,8 +77,8 @@ docs/               进度、源码地图和设计决策
 | --- | --- | --- |
 | 00 | 阅读地图与最小工程 | 已完成 |
 | 01 | DeepSeek 流式请求 | 已完成 |
-| 02 | Message 与内容块 | 待开始 |
-| 03 | 统一模型事件流与 Provider 演进 | 未开始 |
+| 02 | Message 与内容块 | 已完成 |
+| 03 | 统一模型事件流与 Provider 演进 | 待开始 |
 | 04 | Session 与 JSONL | 未开始 |
 | 05 | Context 构建与模型转换 | 未开始 |
 | 06 | 最小 Agent Loop | 未开始 |
@@ -96,6 +97,10 @@ pnpm check
 pnpm test
 pnpm typecheck
 pnpm --filter @x-pi/nano-pi start -- "你好"
+pnpm docs:dev
+pnpm docs:build
 ```
+
+`pnpm docs:dev` 会启动定制学习网站。网站直接读取 `chapters/*/README.md`，并从相邻 `labs/chapter-*` 快照生成每章选定文件的真实代码 Diff。推送到 `main` 后可由 GitHub Actions 发布到 GitHub Pages。
 
 应用通过共享 `@x-pi/config` 从当前目录向上查找最近的 `.env`，因此最后一条命令可以从 monorepo 任意层级启动。也可以用 `ENV_FILE` 指定配置文件。完整讲解见 [Chapter 1](chapters/01-deepseek-stream/README.md)。

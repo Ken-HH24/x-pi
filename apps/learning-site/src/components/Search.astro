@@ -1,0 +1,102 @@
+---
+const base = import.meta.env.BASE_URL;
+---
+
+<div class="search" data-search data-base={base}>
+  <button class="search-trigger" type="button" data-search-open aria-label="搜索章节">
+    <span aria-hidden="true">⌕</span>
+    <span>搜索章节</span>
+    <kbd>/</kbd>
+  </button>
+  <div class="search-popover" data-search-popover hidden>
+    <label class="search-field">
+      <span aria-hidden="true">⌕</span>
+      <input type="search" data-search-input placeholder="搜索概念、函数或章节…" autocomplete="off" />
+      <kbd>Esc</kbd>
+    </label>
+    <div class="search-results" data-search-results>
+      <p class="search-hint">输入关键词，搜索全部已完成章节。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  type SearchEntry = {
+    title: string;
+    number: string;
+    summary: string;
+    href: string;
+    text: string;
+  };
+
+  const root = document.querySelector<HTMLElement>("[data-search]");
+  const openButton = root?.querySelector<HTMLButtonElement>("[data-search-open]");
+  const popover = root?.querySelector<HTMLElement>("[data-search-popover]");
+  const input = root?.querySelector<HTMLInputElement>("[data-search-input]");
+  const results = root?.querySelector<HTMLElement>("[data-search-results]");
+  let entries: SearchEntry[] | undefined;
+
+  async function loadEntries() {
+    if (entries || !root) return entries;
+    const base = (root.dataset.base ?? "/").replace(/\/?$/, "/");
+    entries = await fetch(`${base}search-index.json`).then((response) => response.json());
+    return entries;
+  }
+
+  async function openSearch() {
+    if (!popover || !input) return;
+    popover.hidden = false;
+    await loadEntries();
+    input.focus();
+  }
+
+  function closeSearch() {
+    if (!popover || !input) return;
+    popover.hidden = true;
+    input.value = "";
+  }
+
+  function renderResults(query: string) {
+    if (!results || !entries) return;
+    const normalized = query.trim().toLocaleLowerCase();
+    if (!normalized) {
+      results.innerHTML = '<p class="search-hint">输入关键词，搜索全部已完成章节。</p>';
+      return;
+    }
+    const matches = entries.filter((entry) =>
+      `${entry.title} ${entry.summary} ${entry.text}`.toLocaleLowerCase().includes(normalized)
+    ).slice(0, 8);
+    results.replaceChildren(...matches.map((entry) => {
+      const link = document.createElement("a");
+      link.href = entry.href;
+      link.className = "search-result";
+      const chapter = document.createElement("span");
+      chapter.textContent = `CH ${entry.number}`;
+      const content = document.createElement("span");
+      const title = document.createElement("strong");
+      title.textContent = entry.title;
+      const summary = document.createElement("small");
+      summary.textContent = entry.summary;
+      content.append(title, summary);
+      link.append(chapter, content);
+      return link;
+    }));
+    if (!matches.length) {
+      results.innerHTML = '<p class="search-hint">没有找到匹配内容，换个关键词试试。</p>';
+    }
+  }
+
+  openButton?.addEventListener("click", openSearch);
+  input?.addEventListener("input", () => renderResults(input.value));
+  document.addEventListener("keydown", (event) => {
+    const target = event.target as HTMLElement;
+    if (event.key === "/" && !target.matches("input, textarea, [contenteditable]")) {
+      event.preventDefault();
+      openSearch();
+    }
+    if (event.key === "Escape") closeSearch();
+  });
+  document.addEventListener("click", (event) => {
+    if (popover && !popover.hidden && root && !root.contains(event.target as Node)) closeSearch();
+  });
+</script>

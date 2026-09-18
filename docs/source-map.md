@@ -1,6 +1,6 @@
 # Pi 源码学习地图
 
-更新时间：2026-09-17。
+更新时间：2026-09-18。
 
 本文件不是永久正确的架构说明，而是 `x-pi` 学习过程中持续校准的索引。Pi 主仓库变化很快；进入每个章节时仍需重新核对相关源码。
 
@@ -25,6 +25,12 @@ Pi 当前主仓库的核心 package 包括：
 DeepSeek 当前官方 Chat API 使用 `POST https://api.deepseek.com/chat/completions`，设置 `stream: true` 后以 SSE 返回 OpenAI-compatible chunk。Pi 将这类接口归入模型 API 层；Nano Pi 本章通过注入的 `deepSeekProvider` 解析 `choices[0].delta.content`，通用 SSE 层不依赖厂商格式，并要求 provider 产生 done 事件才视为完整结束。
 
 本章只实现最小 `TextProvider`，并未照搬 Pi 的完整模型系统。reasoning、tool calls、usage、provider registry、重试和统一 AssistantMessage 事件会等到各自问题出现时再加入。
+
+### Chapter 2：应用 Message 与模型请求
+
+Nano Pi 现在用带 `role` 的 user/assistant Message 和 `TextContent[]` 保存应用侧对话。调用 DeepSeek 时，provider 才通过 `textOf()` 把内容块顺序连接成 OpenAI-compatible 的字符串 `content`；HTTP/SSE 层只接收 `Message[]`，不依赖块的内部结构。
+
+流式文本仍来自 Chapter 1 的 Async Generator，但 `collectAssistantMessage()` 会把每个增量同时送给终端并追加到一个 assistant text block，在 done 之后返回完整 Message。这对应 Pi 中“流式构建响应”和“应用消息不等于厂商请求格式”的核心边界，但还是教学简化：没有 usage、stop reason、timestamp、reasoning 或 tool call。
 
 ### 模型消息与 Agent 消息分离
 

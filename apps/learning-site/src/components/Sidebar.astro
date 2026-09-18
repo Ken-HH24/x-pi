@@ -1,0 +1,48 @@
+---
+import type { Chapter } from "@/lib/chapters";
+import { chapterHref, chapterNumber } from "@/lib/chapters";
+import { roadmap } from "@/data/roadmap";
+
+interface Props {
+  chapters: Chapter[];
+  currentOrder?: number;
+}
+
+const { chapters, currentOrder } = Astro.props;
+const chapterByOrder = new Map(chapters.map((chapter) => [chapter.data.order, chapter]));
+---
+
+<aside class="sidebar" data-sidebar>
+  <div class="sidebar-heading">
+    <span>学习路线</span>
+    <span class="chapter-count">{chapters.length}/{roadmap.length}</span>
+  </div>
+  <nav aria-label="章节导航">
+    <ol class="chapter-list">
+      {roadmap.map((title, order) => {
+        const chapter = chapterByOrder.get(order);
+        const isActive = currentOrder === order;
+        return (
+          <li>
+            {chapter ? (
+              <a class:list={["chapter-link", { active: isActive }]} href={chapterHref(chapter)} aria-current={isActive ? "page" : undefined}>
+                <span class="chapter-number">{chapterNumber(order)}</span>
+                <span>{title}</span>
+                <span class="chapter-state complete" aria-label="已完成">✓</span>
+              </a>
+            ) : (
+              <span class="chapter-link upcoming" aria-disabled="true">
+                <span class="chapter-number">{chapterNumber(order)}</span>
+                <span>{title}</span>
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  </nav>
+  <div class="sidebar-note">
+    <span class="pulse-dot"></span>
+    下一章：统一模型事件流
+  </div>
+</aside>

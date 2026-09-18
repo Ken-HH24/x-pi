@@ -1,3 +1,22 @@
+---
+order: 0
+slug: roadmap
+title: 先画地图，再开始写 Agent
+summary: 从真实数据流出发，建立 Pi 的三层边界与两条学习路线。
+status: completed
+delta:
+  concepts:
+    - 模型层、Agent 层、应用层三层边界
+    - Nano Pi 与 Agent Harness 两条实现轨道
+  behaviors:
+    - 建立可跨会话恢复的学习进度
+    - 用章节快照保留每一步实现
+  files:
+    - README.md 与章节路线
+    - docs/progress.md 与源码学习地图
+diffFiles: []
+---
+
 # Chapter 0：先画地图，再开始写 Agent
 
 ## 一句话总结
@@ -78,4 +97,3 @@ pnpm list -r --depth -1
 ## 下一章
 
 Chapter 1 将只解决一个问题：DeepSeek 如何通过 SSE 把一个回答分成许多增量传回来，以及 Node.js 如何正确消费、取消和报告这条流。
-
