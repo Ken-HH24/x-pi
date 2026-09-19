@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 04-session-jsonl
+current_chapter: 05-context
 status: ready
-last_completed: 03-model-events
-next_action: 将 done 事件产生的完整 Message 追加到 JSONL Session，并实现恢复
+last_completed: 04-session-jsonl
+next_action: 从 Session 记录构建模型 Context，并明确存储消息与模型消息的转换边界
 runtime:
   node: 24.18.1
   pnpm: 11.18.0
@@ -45,17 +45,21 @@ decisions:
 - [x] 用 start、text_delta 和 done 取代裸字符串增量。
 - [x] 用共享 partial 构建 assistant Message，并让终端只消费统一事件。
 - [x] 添加 Chapter 3 离线测试、独立快照与完整教程。
+- [x] 核对 Pi 当前 Session v3、追加式 message entry 与树形边界。
+- [x] 实现最小 JSONL Session，追加 user 与 done assistant Message。
+- [x] 启动时恢复历史，并把恢复后的消息发送给模型。
+- [x] 处理缺失/空文件、损坏记录和未完成尾行。
+- [x] 添加 Chapter 4 离线测试、独立快照与完整教程。
 
 ## 下一步验收条件
 
-Chapter 4 只有满足以下条件才算完成：
+Chapter 5 只有满足以下条件才算完成：
 
-- [ ] 核对 Pi 当前 Session JSONL 格式与追加/恢复边界。
-- [ ] 定义最小 Session 记录，不提前引入树形分支。
-- [ ] 在 user Message 和 done assistant Message 产生时追加 JSONL。
-- [ ] 启动时恢复历史，并将其发送给模型。
-- [ ] 处理空文件、损坏行和未完成最后一行。
-- [ ] 添加离线测试、完整讲解和 Chapter 4 快照。
+- [ ] 核对 Pi 当前 `buildSessionContext()` 与 `convertToLlm()` 边界。
+- [ ] 明确 Session record、应用 Message 和模型请求 Message 的不同职责。
+- [ ] 从恢复的 Session 记录构建本轮 Context。
+- [ ] 为不进入模型上下文的记录留出明确扩展边界。
+- [ ] 添加离线测试、完整讲解和 Chapter 5 快照。
 
 ## 暂不处理
 
@@ -68,7 +72,7 @@ Chapter 4 只有满足以下条件才算完成：
 下一位执行者应先检查工作树，然后阅读：
 
 1. `README.md`
-2. `chapters/03-model-events/README.md`
+2. `chapters/04-session-jsonl/README.md`
 3. `docs/source-map.md`
 4. `docs/decisions.md`
 5. `docs/chapter-template.md`

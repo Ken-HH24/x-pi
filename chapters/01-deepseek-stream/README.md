@@ -497,7 +497,7 @@ fixture 和 fake fetch 让测试完全离线，不消耗 DeepSeek API 额度。
 - `src/stream.ts`：82 行，处理通用 HTTP 与 SSE。
 - `src/providers/deepseek.ts`：33 行，处理 DeepSeek 格式。
 
-核心教学代码共 153 行，接近每章 100–150 行的指导范围；多出的少量行用于保留 provider 注入边界和必要注释。测试与 fixture 不计入该限制。
+核心教学代码共 153 行，规模仍然集中；额外代码用于保留 provider 注入边界和必要注释。100–150 行只是复杂度参考，不是硬限制，测试与 fixture 也不机械计入核心教学代码。
 
 ## 已知限制
 

@@ -55,6 +55,20 @@ const demos: Record<number, Demo> = {
       { title: "发出 done", detail: "done 携带最终 Message，随后才进入历史。", node: 2, output: "$ nano-pi \"介绍 SSE\"\n服务器推送\n", state: { type: "done", message: { role: "assistant", content: [{ type: "text", text: "服务器推送" }] } }, file: "src/stream.ts → src/main.ts", source: "// stream.ts\nyield { type: \"done\", message: partial };\n\n// main.ts\nif (event.type === \"done\") messages.push(event.message);" },
     ],
   },
+  4: {
+    title: "观察 Session 如何跨启动恢复",
+    description: "重放两次 CLI 启动，检查完整消息何时进入 JSONL，何时重新成为模型历史。",
+    nodes: ["CLI", "Session", "JSONL", "Model", "Next Run"],
+    steps: [
+      { title: "打开 Session", detail: "第一次启动时文件不存在，恢复为空消息数组。", node: 1, output: "$ nano-pi \"记住数字 42\"\n", state: { path: ".x-pi/session.jsonl", messages: [], count: 0 }, file: "src/session.ts", source: "const session = await Session.open(sessionPath);\n// 文件不存在时返回空历史：[]" },
+      { title: "提交 user", detail: "请求模型前，先把完整 user Message 追加为一行 JSONL。", node: 2, output: "$ nano-pi \"记住数字 42\"\n", state: { record: { type: "message", role: "user", text: "记住数字 42" }, committed: true, count: 1 }, file: "src/conversation.ts → src/session.ts", source: "const user = userMessage(prompt);\nawait session.append(user);\n// JSONL: { type, timestamp, message }" },
+      { title: "发送完整历史", detail: "模型请求读取追加后的 session.messages。", node: 3, output: "$ nano-pi \"记住数字 42\"\n", state: { requestMessages: ["user(记住数字 42)"], stream: true }, file: "src/conversation.ts", source: "for await (const event of streamModel(\n  session.messages, provider, options,\n)) {\n  // 消费统一模型事件\n}" },
+      { title: "提交 done 消息", detail: "text_delta 只显示；只有 done 的完整 assistant Message 才会落盘。", node: 2, output: "$ nano-pi \"记住数字 42\"\n好的，我记住了 42。\n", state: { record: { type: "message", role: "assistant", text: "好的，我记住了 42。" }, committed: true, count: 2 }, file: "src/conversation.ts", source: "if (event.type === \"text_delta\") onText(event.delta);\nif (event.type === \"done\") {\n  await session.append(event.message);\n}" },
+      { title: "查看保存文件", detail: "用普通文本命令检查实际 JSONL；每条已提交 Message 独占一行。", node: 2, output: "$ sed -n '1,2p' /tmp/x-pi-demo.jsonl\n{\"type\":\"message\",\"timestamp\":\"2026-09-19T10:00:00.000Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"记住数字 42\"}]}}\n{\"type\":\"message\",\"timestamp\":\"2026-09-19T10:00:01.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"好的，我记住了 42。\"}]}}\n", state: { file: "/tmp/x-pi-demo.jsonl", format: "JSONL", committedLines: 2 }, file: "/tmp/x-pi-demo.jsonl", source: "{ type: \"message\", timestamp: \"...\", message: userMessage }\n{ type: \"message\", timestamp: \"...\", message: assistantMessage }" },
+      { title: "再次启动恢复", detail: "第二次启动逐行验证 JSONL，恢复上一轮的两条完整消息。", node: 4, output: "$ nano-pi \"我让你记住了什么？\"\n", state: { restored: ["user(记住数字 42)", "assistant(好的，我记住了 42。)"], count: 2 }, file: "src/session.ts", source: "const records = lines\n  .map(({ line, lineNumber }) => parseRecord(line, lineNumber));\nreturn new Session(path, records.map((record) => record.message));" },
+      { title: "继续同一对话", detail: "新问题追加后，与恢复的历史一起发送给模型。", node: 3, output: "$ nano-pi \"我让你记住了什么？\"\n你让我记住数字 42。\n", state: { requestMessages: ["user(记住数字 42)", "assistant(好的，我记住了 42。)", "user(我让你记住了什么？)"], count: 3 }, file: "src/conversation.ts", source: "await session.append(user);\nfor await (const event of streamModel(session.messages, provider, options)) {\n  if (event.type === \"text_delta\") onText(event.delta);\n}" },
+    ],
+  },
 };
 
 const { order } = Astro.props as { order: number };
@@ -146,6 +160,9 @@ const demo = demos[order];
       "积累第一段": "block.text +=", "积累第二段": "block.text +=", "追加完整回复": "messages.push",
       "选择 Provider 与 Model": "defaultModel", "发出 start": "yield { type", "第一个 text_delta": "block.text +=",
       "第二个 text_delta": "process.stdout.write", "发出 done": "yield { type",
+      "打开 Session": "Session.open", "提交 user": "session.append", "发送完整历史": "streamModel",
+      "提交 done 消息": "event.type ===", "查看保存文件": "type:",
+      "再次启动恢复": "parseRecord", "继续同一对话": "session.append",
     };
     const stateKeys: Record<string, string[]> = {
       "准备输入": ["prompt"], "发送请求": ["method", "stream"], "缓冲网络分片": ["buffer", "completeEvent"],
@@ -154,6 +171,10 @@ const demo = demos[order];
       "积累第一段": ["content"], "积累第二段": ["content"], "追加完整回复": ["messages", "count"],
       "选择 Provider 与 Model": ["provider", "model", "api"], "发出 start": ["type", "partial"],
       "第一个 text_delta": ["delta", "partial"], "第二个 text_delta": ["delta", "partial"], "发出 done": ["type", "message"],
+      "打开 Session": ["path", "messages"], "提交 user": ["record", "committed"],
+      "发送完整历史": ["requestMessages"], "提交 done 消息": ["record", "committed"],
+      "查看保存文件": ["file", "format", "committedLines"], "再次启动恢复": ["restored"],
+      "继续同一对话": ["requestMessages"],
     };
     const escapeHtml = (value: string) => value
       .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
