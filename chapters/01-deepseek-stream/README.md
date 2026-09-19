@@ -117,6 +117,53 @@ streamText(prompt, deepSeekProvider, options)
 
 这还不是 Pi 的完整 provider registry。Chapter 3 会在引入统一模型事件时继续拆分“模型信息”和“API 协议实现”，并对照 Pi 当前的 Models/provider 机制。
 
+## 先认清本章的六种数据
+
+“流”“chunk”和“事件”很容易被混用。本章实际经过六种不同数据，它们的边界不能互换：
+
+| 层级 | TypeScript 或协议形状 | 示例 | 谁负责处理 |
+| --- | --- | --- | --- |
+| 网络分片 | `Uint8Array` | 一段任意截断的 UTF-8 bytes | `TextDecoder` |
+| 解码文本 | `string` | `data: {"choi` | `parseSse()` 的 buffer |
+| SSE 事件 | 以空行结尾的一组字段 | `data: {...}\n\n` | `parseSse()` |
+| SSE data | 从事件中取出的字符串 | `{"choices":[...]}` 或 `[DONE]` | `provider.parse()` |
+| ProviderEvent | 内部可辨识联合 | `{ type: "text", text: "你" }` | `parseSse()` |
+| 文本增量 | `string` | `"你"` | CLI |
+
+对应的类型是：
+
+```ts
+type ProviderEvent =
+  | { type: "text"; text: string }
+  | { type: "done" }
+  | { type: "ignore" };
+```
+
+一条 DeepSeek 文本响应在各层的真实长相如下：
+
+```text
+网络 bytes
+  64 61 74 61 3a 20 7b ...          Uint8Array
+        |
+        v TextDecoder
+解码文本
+  data: {"choices":[{"delta":{"content":"你"}}]}\n\n
+        |
+        v 按空行切分 SSE event
+SSE data
+  {"choices":[{"delta":{"content":"你"}}]}
+        |
+        v provider.parse(data)
+ProviderEvent
+  { type: "text", text: "你" }
+        |
+        v parseSse() yield
+文本增量
+  "你"
+```
+
+这里最关键的区别是：一次 `reader.read()` 得到的是网络分片，不是 SSE 事件；一个 SSE data 也不等于应用最终保存的 Message。本章只走到文本增量，Message 会在 Chapter 2 引入。
+
 ## 第一步：CLI 读取输入
 
 `main.ts` 从 `process.argv` 读取问题：
@@ -171,6 +218,30 @@ defaultModel: "deepseek-flash",
 { type: "text", text: "你" }
 { type: "ignore" }
 { type: "done" }
+```
+
+DeepSeek 的单个 JSON data 使用下面的最小读取形状：
+
+```ts
+type DeepSeekChunk = {
+  choices?: Array<{
+    delta?: { content?: unknown };
+  }>;
+};
+```
+
+例如文本 data 是：
+
+```json
+{
+  "choices": [
+    {
+      "delta": {
+        "content": "你"
+      }
+    }
+  ]
+}
 ```
 
 `content` 为 `null`、缺失或空字符串的 role、finish、reasoning 分片暂时是 `ignore`；文本 chunk 是 `text`；`[DONE]` 是 `done`。这样 SSE 层不需要认识 DeepSeek JSON，同时数字或对象等异常 content 类型仍会明确报错。

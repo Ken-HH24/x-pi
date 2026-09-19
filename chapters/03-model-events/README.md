@@ -118,6 +118,48 @@ CLI / 未来的 Agent Loop
 
 严格按职责命名，当前的 `ProviderEvent` 也可以叫 `ApiEvent` 或 `ParsedChunk`，因为它实际来自 `ChatCompletionsApi.parse()`。本章保留 `ProviderEvent` 是为了延续已有代码，但不要把它理解为应用层公共事件。
 
+## 贯穿 Chapter 1–3 的数据结构总览
+
+到本章为止，一次响应会依次经过下面这些形状：
+
+| 顺序 | 数据 | 示例 | 引入章节 |
+| --- | --- | --- | --- |
+| 1 | 网络分片 `Uint8Array` | 任意截断的 UTF-8 bytes | Chapter 1 |
+| 2 | SSE 事件文本 | `data: {...}\n\n` | Chapter 1 |
+| 3 | SSE data string | `{"choices":[...]}` | Chapter 1 |
+| 4 | `ProviderEvent` | `{ type: "text", text: "服务" }` | Chapter 1，Chapter 3 保留为低层事件 |
+| 5 | `ModelEvent` | `{ type: "text_delta", delta: "服务", partial }` | Chapter 3 |
+| 6 | `AssistantMessage` | `{ role: "assistant", content: [...] }` | Chapter 2，Chapter 3 改由事件流构建 |
+
+它们的包含关系不是“一种对象不断增加字段”，而是跨边界转换：
+
+```text
+传输层             API 解析层              统一模型层             应用消息
+
+Uint8Array
+   -> SSE event
+      -> data string
+         -> ProviderEvent
+            -> ModelEvent + shared partial
+                              -> AssistantMessage
+```
+
+`partial` 的具体形状仍是 Chapter 2 定义的 AssistantMessage：
+
+```ts
+{
+  role: "assistant",
+  content: [
+    { type: "text", text: "服务器推送" }
+  ]
+}
+```
+
+区别只是构建方式发生了变化：
+
+- Chapter 2：`collectAssistantMessage()` 从 `AsyncIterable<string>` 中积累它。
+- Chapter 3：`streamModel()` 在产生 ModelEvent 的同时推进 shared partial，`done` 携带最终 Message。
+
 ## 分步实现
 
 ### 1. 定义最小模型事件

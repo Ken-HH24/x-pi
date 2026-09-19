@@ -94,6 +94,71 @@ HTTP / SSE -> text chunk -> onText()    |
 
 应用消息与厂商请求不是同一种数据。`Message[]` 是 Nano Pi 希望保存和继续扩展的格式；只有请求 DeepSeek 时，provider 才把文本块折叠成 API 当前接受的字符串 `content`。
 
+## 本章的数据结构长什么样
+
+Chapter 1 最终向上吐出 `AsyncIterable<string>`，其中每个 string 是模型文本增量，不是网络分片，也不是完整 Message。Chapter 2 在它的两端增加应用消息结构：
+
+```ts
+type TextContent = {
+  type: "text";
+  text: string;
+};
+
+type UserMessage = {
+  role: "user";
+  content: readonly TextContent[];
+};
+
+type AssistantMessage = {
+  role: "assistant";
+  content: readonly TextContent[];
+};
+
+type Message = UserMessage | AssistantMessage;
+```
+
+三个具体值分别是：
+
+```ts
+// 用户输入进入应用后的形状
+const user: UserMessage = {
+  role: "user",
+  content: [{ type: "text", text: "介绍 SSE" }],
+};
+
+// 模型流中途的文本增量：它还不是 Message
+const delta: string = "服务";
+
+// 所有增量积累完成后的形状
+const assistant: AssistantMessage = {
+  role: "assistant",
+  content: [{ type: "text", text: "服务器推送" }],
+};
+```
+
+应用数据和厂商数据的对应关系是：
+
+| 名称 | 形状 | 生命周期 | 是否保存 |
+| --- | --- | --- | --- |
+| user Message | `{ role, content: TextContent[] }` | CLI 输入后立即形成 | 是 |
+| DeepSeek request message | `{ role, content: string }` | 仅在发请求时临时转换 | 否 |
+| 文本增量 | `string` | 流式响应过程中出现多次 | 单独不保存 |
+| assistant partial | `{ role, content: [{ text: "..." }] }` | 每个文本增量到达时增长 | 流完成前不保存 |
+| assistant Message | 与 partial 同一结构，内容已完整 | 收到 `[DONE]` 后形成 | 是 |
+
+因此不要把下面几个概念混为一谈：
+
+```text
+网络分片 Uint8Array
+    -> SSE data string
+    -> ProviderEvent.text
+    -> 文本增量 string
+    -> assistant TextContent.text
+    -> 完整 AssistantMessage
+```
+
+本章的 `collectAssistantMessage()` 只负责最后两步。前面的网络分片、SSE 和 ProviderEvent 仍由 Chapter 1 的 `parseSse()` 与 provider 处理。
+
 ## 分步实现
 
 ### 1. 定义最小 Message
@@ -202,8 +267,8 @@ messages.push(assistant);
 | CLI 输入 | `介绍 SSE` |
 | 应用历史 | `user("你好")`, `assistant("你好！")`, `user("介绍 SSE")` |
 | DeepSeek 请求 | `messages: [{role:"user",content:"你好"}, {role:"assistant",content:"你好！"}, {role:"user",content:"介绍 SSE"}]` |
-| SSE chunk 1 | 终端输出“服务”；assistant block 为 `"服务"` |
-| SSE chunk 2 | 终端追加“器推送”；assistant block 为 `"服务器推送"` |
+| 模型文本增量 1 | `"服务"`；终端输出“服务”；assistant block 为 `"服务"` |
+| 模型文本增量 2 | `"器推送"`；终端追加“器推送”；assistant block 为 `"服务器推送"` |
 | `[DONE]` | 返回 `{role:"assistant", content:[{type:"text", text:"服务器推送"}]}` |
 | 最终历史 | 原三条消息后追加完整 assistant Message |
 
