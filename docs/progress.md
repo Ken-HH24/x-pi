@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 06-agent-loop
+current_chapter: 07-tool-calling
 status: ready
-last_completed: 05-context
-next_action: 用 Agent 层拥有 turn 生命周期，建立最小 Agent Loop 与稳定事件边界
+last_completed: 06-agent-loop
+next_action: 扩展 Message 与模型事件，接收并组装结构化 tool call
 runtime:
   node: 24.18.1
   pnpm: 11.18.0
@@ -55,16 +55,21 @@ decisions:
 - [x] 用 note record 建立“持久化但不进入模型”的扩展边界。
 - [x] 将应用 Message 转成规范化 `LlmMessage` 后再交给 provider。
 - [x] 添加 Chapter 5 离线测试、独立快照与完整教程。
+- [x] 核对 Pi 当前 agent loop、turn 与 Agent 事件顺序。
+- [x] 让 Agent 层拥有一次 turn 的模型调用与消息提交。
+- [x] 建立最小 Agent、turn 与 message 生命周期事件。
+- [x] CLI 改为只消费 Agent 事件，不直接编排模型流。
+- [x] 添加 Chapter 6 离线测试、独立快照、流程图与完整教程。
 
 ## 下一步验收条件
 
-Chapter 6 只有满足以下条件才算完成：
+Chapter 7 只有满足以下条件才算完成：
 
-- [ ] 核对 Pi 当前 agent loop、turn 与 Agent 事件顺序。
-- [ ] 让 Agent 层拥有一次 turn 的模型调用与消息提交。
-- [ ] 建立最小 `agent_start`、turn、message update 和结束事件。
-- [ ] CLI 只消费 Agent 事件，不直接编排模型流。
-- [ ] 添加离线测试、完整讲解和 Chapter 6 快照。
+- [ ] 核对 Pi 当前 tool call 内容块、流事件与 provider 转换。
+- [ ] 扩展 assistant Message，使其能保存结构化 tool call。
+- [ ] 从 DeepSeek 流中正确组装跨 chunk 的 tool call 参数。
+- [ ] Agent 事件能暴露 tool call 的增量和最终状态。
+- [ ] 添加离线测试、完整讲解和 Chapter 7 快照。
 
 ## 暂不处理
 
@@ -77,7 +82,7 @@ Chapter 6 只有满足以下条件才算完成：
 下一位执行者应先检查工作树，然后阅读：
 
 1. `README.md`
-2. `chapters/05-context/README.md`
+2. `chapters/06-agent-loop/README.md`
 3. `docs/source-map.md`
 4. `docs/decisions.md`
 5. `docs/chapter-template.md`

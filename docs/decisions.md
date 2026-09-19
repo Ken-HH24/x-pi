@@ -101,3 +101,9 @@ Chapter 5 起，Session 保留完整 record，`buildContext()` 负责选择参�
 状态：已接受。
 
 除 Chapter 0 外，每个完成的章节不仅要有 lab、Diff、运行命令和正文，还必须在学习网站提供与 Chapter 01–04 同等完整的交互式 Runtime Demo。演示逐步展示终端输出、关键状态、对应源码与真实数据流；新增章节若存在 lab 却没有演示，`pnpm docs:build` 必须失败，避免静默退化为空白的“源码与运行”页面。特殊运行方式需要同步更新章节页的 `runCommand`。
+
+## D-018：CLI 只消费 Agent 生命周期事件
+
+状态：已接受。
+
+Chapter 6 起，Agent 层拥有 user 提交、Context 构建、一次模型调用和完整 assistant 提交，并发出 Agent、turn 与 message 生命周期事件。CLI 不直接消费模型流，也不负责 Session 提交；它只从 `message_update` 读取文本 delta。模型 partial 可以保持共享可变语义，但 Agent 事件携带事件时刻的消息快照，避免历史事件被后续增量改写。

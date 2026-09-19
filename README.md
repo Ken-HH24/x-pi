@@ -66,7 +66,7 @@ docs/               进度、源码地图和设计决策
 
 ## 当前进度
 
-当前完成 Chapter 5：从完整 Session record 选择本轮 Context，再转换成模型 Message；持久化记录不再默认全部进入模型。下一步是 Chapter 6：建立最小 Agent Loop。
+当前完成 Chapter 6：由 Agent 层拥有一次 turn，并把模型流提升为稳定的 Agent 生命周期事件；CLI 只消费事件。下一步是 Chapter 7：加入 Tool Calling 协议。
 
 新会话开始时，先阅读 [docs/progress.md](docs/progress.md)，再阅读当前章节文档。
 
@@ -82,8 +82,8 @@ docs/               进度、源码地图和设计决策
 | 03 | 统一模型事件流与 Provider 演进 | 已完成 |
 | 04 | Session 与 JSONL | 已完成 |
 | 05 | Context 构建与模型转换 | 已完成 |
-| 06 | 最小 Agent Loop | 待开始 |
-| 07 | Tool Calling 协议 | 未开始 |
+| 06 | 最小 Agent Loop | 已完成 |
+| 07 | Tool Calling 协议 | 待开始 |
 | 08 | 多轮工具循环 | 未开始 |
 | 09 | CLI、取消与恢复 | 未开始 |
 | 10 | Session Tree 与分支 | 未开始 |

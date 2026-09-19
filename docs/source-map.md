@@ -50,6 +50,12 @@ Pi 当前 `buildSessionContext()` 先沿活动分支选择 context entries，处
 
 Nano Pi 保留这一职责顺序但继续使用线性历史：`Session.records` 保存 message 与 note，`buildContext()` 只选择 message record，`convertToLlm()` 再把应用 content block 合并为纯文本 `LlmMessage`。note 展示“值得持久化但不该发送给模型”的边界；树形路径、摘要和工具消息仍留给后续章节。
 
+### Chapter 6：Agent Loop 与生命周期事件
+
+Pi 当前 `AgentEvent` 分为 Agent、turn、message 和工具执行四组生命周期。新 prompt 的基础顺序是 `agent_start → turn_start → prompt message_start/end → assistant message_start/update/end → turn_end → agent_end`；一次 turn 包含一条 assistant 响应以及由它触发的工具调用与结果。模型流的 partial 会进入当前 Context，并在更新时被替换为最新响应。
+
+Nano Pi 实现无工具的单-turn 子集：`runAgent()` 提交 user、构建 Context、调用模型并只提交 done assistant，再发出稳定的 Agent 事件。`turn_end.toolResults` 当前恒为 `[]`，为后续工具循环保留形状；CLI 只读取 `message_update.modelEvent.delta`。与模型层共享 partial 不同，Agent 事件保存当时的消息快照，避免旧事件被后续 delta 改写。错误合成、工具、多 turn、steering 与 follow-up 仍留给后续章节。
+
 ### 模型消息与 Agent 消息分离
 
 Pi Agent 允许应用自定义 `AgentMessage`，但调用模型前必须经过 `transformContext()` 和 `convertToLlm()`，最终只发送模型理解的消息。Nano Pi 会先从少量消息类型开始，但保留“存储/应用消息不等于 provider 请求格式”这一边界。

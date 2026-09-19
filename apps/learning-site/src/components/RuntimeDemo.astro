@@ -82,6 +82,21 @@ const demos: Record<number, Demo> = {
       { title: "发送模型 Context", detail: "模型看到三条对话消息，Session 中的 note 仍留在磁盘。", node: 4, output: "$ nano-pi \"继续解释\"\nContext 把持久化事实变成当前推理输入。\n", state: { requestMessages: 3, persistedRecords: 4, noteVisibleToModel: false }, file: "src/conversation.ts → src/stream.ts", source: "const context = buildContext(session.records);\nconst llmMessages = convertToLlm(context.messages);\nstreamModel(llmMessages, provider, options);" },
     ],
   },
+  6: {
+    title: "逐事件运行最小 Agent Loop",
+    description: "观察一次输入如何穿过 Agent、turn 与 message 三层生命周期，CLI 只渲染 Agent 事件。",
+    nodes: ["CLI", "Agent", "Session", "Model", "Agent Events"],
+    steps: [
+      { title: "启动 Agent run", detail: "CLI 创建事件流；Agent 先打开 run 和第一个 turn。", node: 1, output: "$ nano-pi \"解释 Agent Loop\"\n", state: { events: ["agent_start", "turn_start"], turn: 1, status: "running" }, file: "src/agent.ts", source: "yield { type: \"agent_start\" };\nyield { type: \"turn_start\" };" },
+      { title: "提交 user 消息", detail: "Agent 发出开始事件，落盘成功后才发出 message_end。", node: 2, output: "$ nano-pi \"解释 Agent Loop\"\n", state: { event: "message_end", role: "user", text: "解释 Agent Loop", committed: true }, file: "src/agent.ts → src/session.ts", source: "yield { type: \"message_start\", message: user };\nawait session.append(user);\nyield { type: \"message_end\", message: user };" },
+      { title: "构建本轮 Context", detail: "Agent 内部完成选择与转换，CLI 不再编排模型输入。", node: 1, output: "$ nano-pi \"解释 Agent Loop\"\n", state: { contextMessages: 3, llmMessages: 3, containsNote: false }, file: "src/agent.ts", source: "const context = buildContext(session.records);\nconst llmMessages = convertToLlm(context.messages);\nstreamModel(llmMessages, provider, options);" },
+      { title: "开始 assistant 消息", detail: "模型 start 被提升为 assistant message_start，当前快照为空。", node: 4, output: "$ nano-pi \"解释 Agent Loop\"\n", state: { event: "message_start", role: "assistant", text: "" }, file: "src/agent.ts", source: "if (modelEvent.type === \"start\") {\n  yield { type: \"message_start\", message: snapshot(modelEvent.partial) };\n}" },
+      { title: "提升第一个增量", detail: "Agent 保存当前快照，同时把模型 delta 交给消费者。", node: 4, output: "$ nano-pi \"解释 Agent Loop\"\nAgent ", state: { event: "message_update", delta: "Agent ", snapshot: "Agent " }, file: "src/agent.ts", source: "yield {\n  type: \"message_update\",\n  message: snapshot(modelEvent.partial),\n  modelEvent,\n};" },
+      { title: "CLI 渲染第二个增量", detail: "CLI 只读取 Agent message_update 中的 delta。", node: 0, output: "$ nano-pi \"解释 Agent Loop\"\nAgent Loop", state: { event: "message_update", delta: "Loop", snapshot: "Agent Loop", cliKnowsSse: false }, file: "src/main.ts", source: "if (event.type === \"message_update\") {\n  process.stdout.write(event.modelEvent.delta);\n}" },
+      { title: "结束 message 与 turn", detail: "完整 assistant 先提交，再按从内到外关闭消息和 turn。", node: 2, output: "$ nano-pi \"解释 Agent Loop\"\nAgent Loop\n", state: { events: ["message_end", "turn_end"], assistantCommitted: true, toolResults: [] }, file: "src/agent.ts", source: "await session.append(modelEvent.message);\nyield { type: \"message_end\", message: modelEvent.message };\nyield { type: \"turn_end\", message: modelEvent.message, toolResults: [] };" },
+      { title: "结束 Agent run", detail: "agent_end 只返回本次 run 新产生的 user 与 assistant。", node: 4, output: "$ nano-pi \"解释 Agent Loop\"\nAgent Loop\n", state: { event: "agent_end", newMessages: ["user", "assistant"], status: "done" }, file: "src/agent.ts", source: "yield { type: \"agent_end\", messages: emittedMessages };\nreturn modelEvent.message;" },
+    ],
+  },
 };
 
 const { order } = Astro.props as { order: number };
@@ -182,6 +197,10 @@ if (order > 0 && !demo) {
       "恢复完整记录": "return new Session", "追加本轮输入": "session.append",
       "筛选应用 Context": "record.type", "转换模型消息": "return messages.map",
       "组装厂商请求": "body:", "发送模型 Context": "buildContext",
+      "启动 Agent run": "agent_start", "提交 user 消息": "session.append",
+      "构建本轮 Context": "buildContext", "开始 assistant 消息": "modelEvent.type",
+      "提升第一个增量": "snapshot", "CLI 渲染第二个增量": "process.stdout.write",
+      "结束 message 与 turn": "session.append", "结束 Agent run": "agent_end",
     };
     const stateKeys: Record<string, string[]> = {
       "准备输入": ["prompt"], "发送请求": ["method", "stream"], "缓冲网络分片": ["buffer", "completeEvent"],
@@ -197,6 +216,10 @@ if (order > 0 && !demo) {
       "恢复完整记录": ["records", "count"], "追加本轮输入": ["appended", "recordCount"],
       "筛选应用 Context": ["contextMessages", "excluded"], "转换模型消息": ["llmMessages", "contentShape"],
       "组装厂商请求": ["messageCount", "containsNote"], "发送模型 Context": ["requestMessages", "persistedRecords", "noteVisibleToModel"],
+      "启动 Agent run": ["events", "turn", "status"], "提交 user 消息": ["event", "committed"],
+      "构建本轮 Context": ["contextMessages", "llmMessages"], "开始 assistant 消息": ["event", "text"],
+      "提升第一个增量": ["delta", "snapshot"], "CLI 渲染第二个增量": ["delta", "cliKnowsSse"],
+      "结束 message 与 turn": ["events", "assistantCommitted", "toolResults"], "结束 Agent run": ["event", "newMessages", "status"],
     };
     const escapeHtml = (value: string) => value
       .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
