@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 05-context
+current_chapter: 06-agent-loop
 status: ready
-last_completed: 04-session-jsonl
-next_action: 从 Session 记录构建模型 Context，并明确存储消息与模型消息的转换边界
+last_completed: 05-context
+next_action: 用 Agent 层拥有 turn 生命周期，建立最小 Agent Loop 与稳定事件边界
 runtime:
   node: 24.18.1
   pnpm: 11.18.0
@@ -50,16 +50,21 @@ decisions:
 - [x] 启动时恢复历史，并把恢复后的消息发送给模型。
 - [x] 处理缺失/空文件、损坏记录和未完成尾行。
 - [x] 添加 Chapter 4 离线测试、独立快照与完整教程。
+- [x] 核对 Pi 当前 `buildSessionContext()`、`transformContext` 与 `convertToLlm()` 的职责顺序。
+- [x] 保留完整 Session record，并从中筛选本轮应用 Context。
+- [x] 用 note record 建立“持久化但不进入模型”的扩展边界。
+- [x] 将应用 Message 转成规范化 `LlmMessage` 后再交给 provider。
+- [x] 添加 Chapter 5 离线测试、独立快照与完整教程。
 
 ## 下一步验收条件
 
-Chapter 5 只有满足以下条件才算完成：
+Chapter 6 只有满足以下条件才算完成：
 
-- [ ] 核对 Pi 当前 `buildSessionContext()` 与 `convertToLlm()` 边界。
-- [ ] 明确 Session record、应用 Message 和模型请求 Message 的不同职责。
-- [ ] 从恢复的 Session 记录构建本轮 Context。
-- [ ] 为不进入模型上下文的记录留出明确扩展边界。
-- [ ] 添加离线测试、完整讲解和 Chapter 5 快照。
+- [ ] 核对 Pi 当前 agent loop、turn 与 Agent 事件顺序。
+- [ ] 让 Agent 层拥有一次 turn 的模型调用与消息提交。
+- [ ] 建立最小 `agent_start`、turn、message update 和结束事件。
+- [ ] CLI 只消费 Agent 事件，不直接编排模型流。
+- [ ] 添加离线测试、完整讲解和 Chapter 6 快照。
 
 ## 暂不处理
 
@@ -72,7 +77,7 @@ Chapter 5 只有满足以下条件才算完成：
 下一位执行者应先检查工作树，然后阅读：
 
 1. `README.md`
-2. `chapters/04-session-jsonl/README.md`
+2. `chapters/05-context/README.md`
 3. `docs/source-map.md`
 4. `docs/decisions.md`
 5. `docs/chapter-template.md`

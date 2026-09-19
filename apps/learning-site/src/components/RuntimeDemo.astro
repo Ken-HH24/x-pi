@@ -69,10 +69,26 @@ const demos: Record<number, Demo> = {
       { title: "继续同一对话", detail: "新问题追加后，与恢复的历史一起发送给模型。", node: 3, output: "$ nano-pi \"我让你记住了什么？\"\n你让我记住数字 42。\n", state: { requestMessages: ["user(记住数字 42)", "assistant(好的，我记住了 42。)", "user(我让你记住了什么？)"], count: 3 }, file: "src/conversation.ts", source: "await session.append(user);\nfor await (const event of streamModel(session.messages, provider, options)) {\n  if (event.type === \"text_delta\") onText(event.delta);\n}" },
     ],
   },
+  5: {
+    title: "观察 Session 如何变成模型 Context",
+    description: "重放包含 message 与 note 的 Session，逐步观察选择、转换和请求边界。",
+    nodes: ["Session", "Context", "Converter", "Provider", "Model"],
+    steps: [
+      { title: "恢复完整记录", detail: "Session 同时恢复对话消息和只给应用看的 note。", node: 0, output: "$ nano-pi \"继续解释\"\n", state: { records: ["message(user)", "note(UI only)", "message(assistant)"], count: 3 }, file: "src/session.ts", source: "const records = lines\n  .map(({ line, lineNumber }) => parseRecord(line, lineNumber));\nreturn new Session(path, records);" },
+      { title: "追加本轮输入", detail: "新 user Message 先成为 Session 事实。", node: 0, output: "$ nano-pi \"继续解释\"\n", state: { appended: "message(user: 继续解释)", recordCount: 4 }, file: "src/conversation.ts", source: "const user = userMessage(prompt);\nawait session.append(user);" },
+      { title: "筛选应用 Context", detail: "buildContext 保留 message，并明确排除 note。", node: 1, output: "$ nano-pi \"继续解释\"\n", state: { inputRecords: 4, contextMessages: 3, excluded: ["note(UI only)"] }, file: "src/context.ts", source: "messages: records.flatMap((record) =>\n  record.type === \"message\" ? [record.message] : []\n)," },
+      { title: "转换模型消息", detail: "convertToLlm 保留角色，并按顺序连接文本块。", node: 2, output: "$ nano-pi \"继续解释\"\n", state: { llmMessages: ["user(解释 Context)", "assistant(Context 负责选择。)", "user(继续解释)"], contentShape: "string" }, file: "src/messages.ts", source: "return messages.map((message) => ({\n  role: message.role,\n  content: textOf(message),\n}));" },
+      { title: "组装厂商请求", detail: "Provider 只接收规范消息并补充模型与 stream 参数。", node: 3, output: "$ nano-pi \"继续解释\"\n", state: { model: "deepseek-flash", messageCount: 3, stream: true, containsNote: false }, file: "src/providers/deepseek.ts", source: "body: (messages, model) => ({\n  model,\n  messages,\n  stream: true,\n})," },
+      { title: "发送模型 Context", detail: "模型看到三条对话消息，Session 中的 note 仍留在磁盘。", node: 4, output: "$ nano-pi \"继续解释\"\nContext 把持久化事实变成当前推理输入。\n", state: { requestMessages: 3, persistedRecords: 4, noteVisibleToModel: false }, file: "src/conversation.ts → src/stream.ts", source: "const context = buildContext(session.records);\nconst llmMessages = convertToLlm(context.messages);\nstreamModel(llmMessages, provider, options);" },
+    ],
+  },
 };
 
 const { order } = Astro.props as { order: number };
 const demo = demos[order];
+if (order > 0 && !demo) {
+  throw new Error(`Chapter ${order} 缺少“源码与运行”交互演示，请更新 RuntimeDemo.astro`);
+}
 ---
 
 {demo && (
@@ -163,6 +179,9 @@ const demo = demos[order];
       "打开 Session": "Session.open", "提交 user": "session.append", "发送完整历史": "streamModel",
       "提交 done 消息": "event.type ===", "查看保存文件": "type:",
       "再次启动恢复": "parseRecord", "继续同一对话": "session.append",
+      "恢复完整记录": "return new Session", "追加本轮输入": "session.append",
+      "筛选应用 Context": "record.type", "转换模型消息": "return messages.map",
+      "组装厂商请求": "body:", "发送模型 Context": "buildContext",
     };
     const stateKeys: Record<string, string[]> = {
       "准备输入": ["prompt"], "发送请求": ["method", "stream"], "缓冲网络分片": ["buffer", "completeEvent"],
@@ -175,6 +194,9 @@ const demo = demos[order];
       "发送完整历史": ["requestMessages"], "提交 done 消息": ["record", "committed"],
       "查看保存文件": ["file", "format", "committedLines"], "再次启动恢复": ["restored"],
       "继续同一对话": ["requestMessages"],
+      "恢复完整记录": ["records", "count"], "追加本轮输入": ["appended", "recordCount"],
+      "筛选应用 Context": ["contextMessages", "excluded"], "转换模型消息": ["llmMessages", "contentShape"],
+      "组装厂商请求": ["messageCount", "containsNote"], "发送模型 Context": ["requestMessages", "persistedRecords", "noteVisibleToModel"],
     };
     const escapeHtml = (value: string) => value
       .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");

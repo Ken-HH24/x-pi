@@ -89,3 +89,15 @@ Chapter 3 起，模型层不再向上层产生裸字符串，而是产生 `start
 状态：已接受。
 
 Chapter 4 的 Session 每行只保存 `type`、`timestamp` 和完整 `message`。user Message 在请求前追加，assistant Message 只在模型产生 `done` 后追加；没有换行的尾部数据视为崩溃时的未提交记录并忽略，其他损坏记录明确报错。Pi 的 header、entry id、parentId、树形分支和迁移属于已核对但刻意延后的能力，将在 Chapter 10 引入。
+
+## D-016：Context 选择与模型转换分离
+
+状态：已接受。
+
+Chapter 5 起，Session 保留完整 record，`buildContext()` 负责选择参与本轮推理的应用 Message，`convertToLlm()` 再把应用内容转换为模型层 Message，provider 只负责厂商请求外壳与响应协议。`note` record 作为最小反例持久化但不进入 Context；这条边界将承接后续工具消息、扩展状态、分支与 compaction。
+
+## D-017：每个实现章节必须提供完整的“源码与运行”演示
+
+状态：已接受。
+
+除 Chapter 0 外，每个完成的章节不仅要有 lab、Diff、运行命令和正文，还必须在学习网站提供与 Chapter 01–04 同等完整的交互式 Runtime Demo。演示逐步展示终端输出、关键状态、对应源码与真实数据流；新增章节若存在 lab 却没有演示，`pnpm docs:build` 必须失败，避免静默退化为空白的“源码与运行”页面。特殊运行方式需要同步更新章节页的 `runCommand`。

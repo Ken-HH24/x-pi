@@ -44,6 +44,12 @@ Pi 当前 Session 文件的第一行是 version 3 header，后续 entry 以 JSON
 
 Nano Pi 本章只保留追加日志的核心：每行是 `{ type: "message", timestamp, message }`，启动时按顺序恢复为 `Message[]`。它尚无 header、版本迁移、entry id、parentId 或 leaf；这些树形职责明确留给 Chapter 10。为处理进程在追加中途退出的情况，没有换行的最后一段被视为未提交记录并忽略；其他格式错误会携带行号失败，不静默跳过历史中的损坏。
 
+### Chapter 5：Context 构建与模型转换
+
+Pi 当前 `buildSessionContext()` 先沿活动分支选择 context entries，处理 compaction 与 branch summary，再转换成 `AgentMessage[]`；模型和 thinking 设置也从同一路径恢复。Agent loop 会先运行可选的 `transformContext()`，再调用 `convertToLlm()`，后者负责把 coding-agent 自定义消息变成 `pi-ai` Message，并过滤不应进入模型的消息。custom Session entry 不参与 LLM context，而 custom message entry 会参与。
+
+Nano Pi 保留这一职责顺序但继续使用线性历史：`Session.records` 保存 message 与 note，`buildContext()` 只选择 message record，`convertToLlm()` 再把应用 content block 合并为纯文本 `LlmMessage`。note 展示“值得持久化但不该发送给模型”的边界；树形路径、摘要和工具消息仍留给后续章节。
+
 ### 模型消息与 Agent 消息分离
 
 Pi Agent 允许应用自定义 `AgentMessage`，但调用模型前必须经过 `transformContext()` 和 `convertToLlm()`，最终只发送模型理解的消息。Nano Pi 会先从少量消息类型开始，但保留“存储/应用消息不等于 provider 请求格式”这一边界。
@@ -81,7 +87,7 @@ Pi 官方说明默认继承启动进程的文件、进程、网络和凭据权�
 
 - DeepSeek 在当前 Pi provider registry 中的完整模型元数据；本章仅确认它复用 OpenAI-compatible API 路径。
 - `packages/ai/src` 中 tool-call 参数拼接的全部 provider 差异。
-- `packages/coding-agent/src` 中 compaction 和扩展加载的最新文件边界；SessionManager 的 header、message entry、树结构和 context 构建边界已在 Chapter 4 核对。
+- `packages/coding-agent/src` 中 compaction 和扩展加载的最新文件边界；SessionManager 的 header、message entry、树结构、context 构建与 `convertToLlm` 边界已在 Chapter 4–5 核对。
 - 新增 `protocol`、`client/server` 后与本地 coding-agent 的具体协作关系。
 
 这些内容会在对应章节开始前核对并写入本文件，不在 Chapter 0 中提前下结论。
