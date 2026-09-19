@@ -78,6 +78,46 @@ HTTP response -> SSE data -> ProviderEvent
 
 Provider 表示服务商，Model 表示具体模型，API 实现负责请求和响应协议。DeepSeek 的 provider 可以复用 chat-completions API，而不需要把这三个概念合并成一个巨大适配器。
 
+## 为什么有 ProviderEvent 和 ModelEvent 两层
+
+本章确实有两种事件，但它们不属于同一个抽象层：
+
+| 事件类型 | 所属边界 | 回答的问题 | 当前事件 |
+| --- | --- | --- | --- |
+| `ProviderEvent` | API/SSE 解析层 | “厂商刚传来了什么？” | `text`、`done`、`ignore` |
+| `ModelEvent` | 统一模型层 | “一次模型生成进行到什么阶段？” | `start`、`text_delta`、`done` |
+
+完整转换路径是：
+
+```text
+DeepSeek SSE JSON
+        |
+        | provider.api.parse(data)
+        v
+ProviderEvent
+  text | done | ignore
+        |
+        | streamModel() 维护 shared partial
+        v
+ModelEvent
+  start | text_delta | done
+        |
+        v
+CLI / 未来的 Agent Loop
+```
+
+`ProviderEvent` 很接近传输协议。例如 DeepSeek 可能返回只包含 role、没有文本的 chunk，API 解析器会把它表示为 `ignore`；这种细节不应该泄漏给 CLI。
+
+`ModelEvent` 是上层依赖的稳定协议。它不只表示“来了一段文字”，还表达响应已经开始、partial 如何增长，以及何时得到了可以保存的完整 Message。以后加入其他厂商时，它们可以产生不同的底层解析结果，但最终都应转换成相同的 ModelEvent。
+
+因此两者不是重复建模：
+
+- `parseSse()` 负责产生 `ProviderEvent`。
+- `streamModel()` 负责把 `ProviderEvent` 提升为 `ModelEvent`，并维护 AssistantMessage。
+- CLI 只消费 `ModelEvent`，不理解 SSE 或 DeepSeek JSON。
+
+严格按职责命名，当前的 `ProviderEvent` 也可以叫 `ApiEvent` 或 `ParsedChunk`，因为它实际来自 `ChatCompletionsApi.parse()`。本章保留 `ProviderEvent` 是为了延续已有代码，但不要把它理解为应用层公共事件。
+
 ## 分步实现
 
 ### 1. 定义最小模型事件
@@ -85,13 +125,20 @@ Provider 表示服务商，Model 表示具体模型，API 实现负责请求和�
 完整代码在 `apps/nano-pi/src/stream.ts`：
 
 ```ts
+export type ProviderEvent =
+  | { type: "text"; text: string }
+  | { type: "done" }
+  | { type: "ignore" };
+
 export type ModelEvent =
   | { type: "start"; partial: AssistantMessage }
   | { type: "text_delta"; delta: string; partial: AssistantMessage }
   | { type: "done"; message: AssistantMessage };
 ```
 
-`type` 是可辨识联合的判别字段。消费者在 `switch` 或 `if` 中检查它后，TypeScript 会知道该事件有 `delta`、`partial` 还是 `message`。这使未来增加 thinking 和 tool call 时不需要约定特殊字符串。
+两种事件都使用 `type` 作为可辨识联合的判别字段。消费者在 `switch` 或 `if` 中检查它后，TypeScript 会知道当前字段是 `text`、`delta`、`partial` 还是 `message`。
+
+这里要注意 `text` 与 `text_delta` 的差别：前者是 API 解析出的文本片段，后者是已经进入统一模型生命周期、同时推进了 partial 的文本增量。
 
 ### 2. 分开 Provider、Model 和 API
 
@@ -117,6 +164,14 @@ export type ModelProvider = {
 
 `ignore` 只是 provider 内部结果，例如只包含 role 的 DeepSeek chunk。它不是应用层事件，所以在 SSE 边界被丢弃。
 
+```ts
+const event = provider.api.parse(data);
+if (event.type !== "ignore") yield event;
+if (event.type === "done") return;
+```
+
+此时还没有 `start` 或 `partial`，因为 `parseSse()` 只理解 SSE 和 API 解析结果，不负责构建应用消息。
+
 ### 4. 用事件推进共享 partial
 
 ```ts
@@ -129,7 +184,7 @@ block.text += event.text;
 yield { type: "text_delta", delta: event.text, partial };
 ```
 
-`partial` 是正在生长的同一个 Message，不是每个事件的历史快照。这避免每个 chunk 都复制已生成文本。当 provider 明确发出 done，流产生 `{ type: "done", message: partial }`。
+这一步发生在 `streamModel()`。它消费较低层的 ProviderEvent，并产生统一的 ModelEvent。`partial` 是正在生长的同一个 Message，不是每个事件的历史快照。这避免每个 chunk 都复制已生成文本。当 provider 明确发出 done，流产生 `{ type: "done", message: partial }`。
 
 ### 5. 终端只关心它需要的事件
 
@@ -152,9 +207,9 @@ DeepSeek 分两块返回“服务”和“器推送”：
 | Provider | 选中 `deepseek-flash` 与 `chat-completions` API |
 | 请求转换 | content block 折叠为 `{role:"user", content:"介绍 SSE"}` |
 | 响应就绪 | `start` 携带空 assistant partial |
-| SSE chunk 1 | `text_delta("服务")`；终端输出“服务”；partial 为“服务” |
-| SSE chunk 2 | `text_delta("器推送")`；终端追加“器推送”；partial 为“服务器推送” |
-| `[DONE]` | `done` 携带完整 assistant Message，然后追加到历史 |
+| SSE chunk 1 | API 先产生 `ProviderEvent.text("服务")`，随后转换为 `ModelEvent.text_delta("服务")`；partial 为“服务” |
+| SSE chunk 2 | API 先产生 `ProviderEvent.text("器推送")`，随后转换为 `ModelEvent.text_delta("器推送")`；partial 为“服务器推送” |
+| `[DONE]` | API 产生 `ProviderEvent.done`；模型层转换为 `ModelEvent.done` 并携带完整 assistant Message |
 
 ## 错误与边界条件
 
