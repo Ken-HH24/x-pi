@@ -66,7 +66,7 @@ docs/               进度、源码地图和设计决策
 
 ## 当前进度
 
-当前完成 Chapter 2：用带角色的 Message 和文本 content block 表示对话，在 provider 边界转换请求，并把流式响应积累成 assistant Message。下一步是 Chapter 3：用统一模型事件表达生成过程。
+当前完成 Chapter 3：分开 Provider、Model 与 API 的最小边界，并用 `start`、`text_delta`、`done` 统一模型生成过程。下一步是 Chapter 4：用 JSONL Session 持久化对话。
 
 新会话开始时，先阅读 [docs/progress.md](docs/progress.md)，再阅读当前章节文档。
 
@@ -79,8 +79,8 @@ docs/               进度、源码地图和设计决策
 | 00 | 阅读地图与最小工程 | 已完成 |
 | 01 | DeepSeek 流式请求 | 已完成 |
 | 02 | Message 与内容块 | 已完成 |
-| 03 | 统一模型事件流与 Provider 演进 | 待开始 |
-| 04 | Session 与 JSONL | 未开始 |
+| 03 | 统一模型事件流与 Provider 演进 | 已完成 |
+| 04 | Session 与 JSONL | 待开始 |
 | 05 | Context 构建与模型转换 | 未开始 |
 | 06 | 最小 Agent Loop | 未开始 |
 | 07 | Tool Calling 协议 | 未开始 |

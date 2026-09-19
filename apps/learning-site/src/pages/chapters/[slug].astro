@@ -3,6 +3,7 @@ import { getCollection, render, type CollectionEntry } from "astro:content";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import ChapterDelta from "@/components/ChapterDelta.astro";
 import CodeDiff from "@/components/CodeDiff.astro";
+import RuntimeDemo from "@/components/RuntimeDemo.astro";
 import { chapterHref, chapterNumber, sortedChapters } from "@/lib/chapters";
 import { createFileDiffs } from "@/lib/diff";
 import { groupForChapter, roadmap } from "@/data/roadmap";
@@ -88,6 +89,7 @@ const githubBase = "https://github.com/Ken-HH24/x-pi/tree/main";
             <a class="source-link" href={`${githubBase}/labs/${chapter.data.lab}`} target="_blank" rel="noreferrer">
               <code>labs/{chapter.data.lab}</code><span>在 GitHub 查看 →</span>
             </a>
+            <RuntimeDemo order={chapter.data.order} />
             <pre><code>{`pnpm --filter @x-pi/lab-${chapter.data.lab} test\npnpm --filter @x-pi/lab-${chapter.data.lab} start -- "你好"`}</code></pre>
           </>
         ) : (

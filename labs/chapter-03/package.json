@@ -1,0 +1,16 @@
+{
+  "name": "@x-pi/lab-chapter-03",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The runnable Chapter 3 snapshot for x-pi.",
+  "dependencies": {
+    "@x-pi/config": "workspace:*"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "check": "node --test test/*.test.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}

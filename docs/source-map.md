@@ -1,6 +1,6 @@
 # Pi 源码学习地图
 
-更新时间：2026-09-18。
+更新时间：2026-09-19。
 
 本文件不是永久正确的架构说明，而是 `x-pi` 学习过程中持续校准的索引。Pi 主仓库变化很快；进入每个章节时仍需重新核对相关源码。
 
@@ -31,6 +31,12 @@ DeepSeek 当前官方 Chat API 使用 `POST https://api.deepseek.com/chat/comple
 Nano Pi 现在用带 `role` 的 user/assistant Message 和 `TextContent[]` 保存应用侧对话。调用 DeepSeek 时，provider 才通过 `textOf()` 把内容块顺序连接成 OpenAI-compatible 的字符串 `content`；HTTP/SSE 层只接收 `Message[]`，不依赖块的内部结构。
 
 流式文本仍来自 Chapter 1 的 Async Generator，但 `collectAssistantMessage()` 会把每个增量同时送给终端并追加到一个 assistant text block，在 done 之后返回完整 Message。这对应 Pi 中“流式构建响应”和“应用消息不等于厂商请求格式”的核心边界，但还是教学简化：没有 usage、stop reason、timestamp、reasoning 或 tool call。
+
+### Chapter 3：Provider、Model、API 与统一事件
+
+Pi 当前的 `Model` 保留 `api` 身份；`Provider` 持有模型列表和 stream 行为，并在内部按 `model.api` 选择 API 实现。DeepSeek provider 组合 `openAICompletionsApi()`，不单独实现协议。Nano Pi 将原来的 `TextProvider` 拆成最小 `ModelProvider`、`Model` 和 `ChatCompletionsApi`，但暂不实现 registry、认证存储或动态模型发现。
+
+Pi 的 `AssistantMessageEvent` 是一个可辨识联合：成功流以 `start` 开始，中间有 text/thinking/tool-call 的 start、delta 和 end，最后以 `done` 结束；失败以 `error` 结束。`partial` 是共享的实时响应，而不是事件时刻的快照。Nano Pi 实现纯文本子集 `start -> text_delta* -> done`，同样用共享 partial 构建最终 Message；错误仍保持抛异常，留待 Agent Loop 阶段统一。
 
 ### 模型消息与 Agent 消息分离
 
@@ -68,7 +74,7 @@ Pi 官方说明默认继承启动进程的文件、进程、网络和凭据权�
 ## 尚待源码级验证
 
 - DeepSeek 在当前 Pi provider registry 中的完整模型元数据；本章仅确认它复用 OpenAI-compatible API 路径。
-- `packages/ai/src` 中流事件和 tool-call 参数拼接的最新实现文件。
+- `packages/ai/src` 中 tool-call 参数拼接的全部 provider 差异。
 - `packages/coding-agent/src` 中 SessionManager、compaction 和扩展加载的最新文件边界。
 - 新增 `protocol`、`client/server` 后与本地 coding-agent 的具体协作关系。
 

@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 03-model-events
+current_chapter: 04-session-jsonl
 status: ready
-last_completed: 02-message
-next_action: 用统一模型事件替代裸字符串增量，并核对 Pi 当前 provider/model/API 边界
+last_completed: 03-model-events
+next_action: 将 done 事件产生的完整 Message 追加到 JSONL Session，并实现恢复
 runtime:
   node: 24.18.1
   pnpm: 11.18.0
@@ -41,18 +41,21 @@ decisions:
 - [x] 完成 Chapter 2 的数据流图、关键代码解释和完整演算。
 - [x] 建立定制章节学习网站、章节搜索与关键 lab Diff。
 - [x] 配置真实 TypeScript typecheck 和 Node.js 类型。
+- [x] 核对 Pi 当前 Provider、Model、API 与 AssistantMessageEvent 边界。
+- [x] 用 start、text_delta 和 done 取代裸字符串增量。
+- [x] 用共享 partial 构建 assistant Message，并让终端只消费统一事件。
+- [x] 添加 Chapter 3 离线测试、独立快照与完整教程。
 
 ## 下一步验收条件
 
-Chapter 3 只有满足以下条件才算完成：
+Chapter 4 只有满足以下条件才算完成：
 
-- [ ] 核对 Pi 当前 `packages/ai` 的 provider、model、API 与流事件实现。
-- [ ] 用具体事件解释裸字符串增量无法表达的状态。
-- [ ] 定义最小、与厂商无关的模型事件流。
-- [ ] 用事件驱动 assistant Message 的增量构建与终端输出。
-- [ ] 保持 Message 转换、SSE 完整性、错误与取消语义。
-- [ ] 核心新增教学代码不超过约 150 行。
-- [ ] 添加离线测试、完整讲解和 Chapter 3 快照。
+- [ ] 核对 Pi 当前 Session JSONL 格式与追加/恢复边界。
+- [ ] 定义最小 Session 记录，不提前引入树形分支。
+- [ ] 在 user Message 和 done assistant Message 产生时追加 JSONL。
+- [ ] 启动时恢复历史，并将其发送给模型。
+- [ ] 处理空文件、损坏行和未完成最后一行。
+- [ ] 添加离线测试、完整讲解和 Chapter 4 快照。
 
 ## 暂不处理
 
@@ -65,7 +68,7 @@ Chapter 3 只有满足以下条件才算完成：
 下一位执行者应先检查工作树，然后阅读：
 
 1. `README.md`
-2. `chapters/01-deepseek-stream/README.md`
+2. `chapters/03-model-events/README.md`
 3. `docs/source-map.md`
 4. `docs/decisions.md`
 5. `docs/chapter-template.md`

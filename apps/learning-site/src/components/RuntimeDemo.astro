@@ -1,0 +1,263 @@
+---
+interface DemoStep {
+  title: string;
+  detail: string;
+  node: number;
+  output: string;
+  state: Record<string, unknown>;
+  file: string;
+  source: string;
+}
+
+interface Demo {
+  title: string;
+  description: string;
+  nodes: string[];
+  steps: DemoStep[];
+}
+
+const demos: Record<number, Demo> = {
+  1: {
+    title: "观察 SSE 如何变成文字",
+    description: "重放离线 fixture，网络分片与 SSE 事件刻意不对齐。",
+    nodes: ["CLI", "HTTP", "SSE Parser", "DeepSeek", "Terminal"],
+    steps: [
+      { title: "准备输入", detail: "CLI 收到用户 prompt。", node: 0, output: "$ nano-pi \"你好\"\n", state: { prompt: "你好", signal: "active" }, file: "src/main.ts", source: "const prompt = args.join(\" \").trim();\n\nfor await (const text of streamText(prompt, deepSeekProvider, options)) {\n  process.stdout.write(text);\n}" },
+      { title: "发送请求", detail: "fetch 发出流式 Chat Completions 请求。", node: 1, output: "$ nano-pi \"你好\"\n", state: { method: "POST", stream: true, model: "deepseek-flash" }, file: "src/stream.ts", source: "const response = await request(provider.url, {\n  method: \"POST\",\n  headers: provider.headers(options.apiKey),\n  body: JSON.stringify(provider.body(prompt, model)),\n  signal: options.signal ?? null,\n});" },
+      { title: "缓冲网络分片", detail: "半个 JSON 暂存，不能误当成完整 SSE 事件。", node: 2, output: "$ nano-pi \"你好\"\n", state: { buffer: "data: {\"choices\":[{\"delta\":{\"content\":\"", completeEvent: false }, file: "src/stream.ts", source: "buffer += decoder.decode(part.value, { stream: !part.done });\nconst events = buffer.split(/\\r?\\n\\r?\\n/);\nbuffer = events.pop() ?? \"\";" },
+      { title: "解析第一段文本", detail: "完整 data 事件被 provider 解释为文本。", node: 3, output: "$ nano-pi \"你好\"\n你", state: { providerEvent: { type: "text", text: "你" }, buffer: "" }, file: "src/providers/deepseek.ts", source: "const content = chunk.choices?.[0]?.delta?.content;\nif (content == null || content === \"\") return { type: \"ignore\" };\nreturn { type: \"text\", text: content };" },
+      { title: "继续流式输出", detail: "第二个文本事件立即写入终端。", node: 4, output: "$ nano-pi \"你好\"\n你好", state: { providerEvent: { type: "text", text: "好" }, rendered: "你好" }, file: "src/stream.ts", source: "const event = provider.parse(data);\nif (event.type === \"done\") return;\nif (event.type === \"text\") yield event.text;" },
+      { title: "确认完整结束", detail: "只有 [DONE] 才代表响应完整。", node: 4, output: "$ nano-pi \"你好\"\n你好\n", state: { providerEvent: { type: "done" }, complete: true }, file: "src/providers/deepseek.ts", source: "parse(data) {\n  if (data === \"[DONE]\") return { type: \"done\" };\n  // 其他 chunk 继续解析为文本\n}" },
+    ],
+  },
+  2: {
+    title: "看见 Message 的形成过程",
+    description: "同一批文本增量既即时输出，也积累成完整 assistant Message。",
+    nodes: ["Prompt", "Message[]", "Provider", "Collector", "Terminal"],
+    steps: [
+      { title: "创建 user Message", detail: "裸 prompt 进入带角色的内容块。", node: 0, output: "$ nano-pi \"介绍 SSE\"\n", state: { role: "user", content: [{ type: "text", text: "介绍 SSE" }] }, file: "src/messages.ts", source: "export function userMessage(text: string): UserMessage {\n  return { role: \"user\", content: [{ type: \"text\", text }] };\n}" },
+      { title: "构建消息历史", detail: "应用层传递 Message[]，不传厂商对象。", node: 1, output: "$ nano-pi \"介绍 SSE\"\n", state: { messages: ["user(介绍 SSE)"], count: 1 }, file: "src/main.ts", source: "const messages: Message[] = [userMessage(prompt)];\nconst assistant = await collectAssistantMessage(\n  streamText(messages, deepSeekProvider, options),\n);" },
+      { title: "转换请求格式", detail: "到 provider 边界才折叠 content blocks。", node: 2, output: "$ nano-pi \"介绍 SSE\"\n", state: { role: "user", content: "介绍 SSE", stream: true }, file: "src/providers/deepseek.ts", source: "messages: messages.map((message) => ({\n  role: message.role,\n  content: textOf(message),\n}))," },
+      { title: "积累第一段", detail: "chunk 写入终端，同时追加到 text block。", node: 3, output: "$ nano-pi \"介绍 SSE\"\n服务", state: { role: "assistant", content: [{ type: "text", text: "服务" }] }, file: "src/messages.ts", source: "for await (const text of stream) {\n  onText(text);\n  block.text += text;\n}\nreturn message;" },
+      { title: "积累第二段", detail: "网络分片没有业务含义，仍属于同一条消息。", node: 4, output: "$ nano-pi \"介绍 SSE\"\n服务器推送", state: { role: "assistant", content: [{ type: "text", text: "服务器推送" }] }, file: "src/messages.ts", source: "// 第二个 chunk 仍追加到同一个 block\nonText(\"器推送\");\nblock.text += \"器推送\";\n// block.text === \"服务器推送\"" },
+      { title: "追加完整回复", detail: "流完成后只产生一条 assistant Message。", node: 1, output: "$ nano-pi \"介绍 SSE\"\n服务器推送\n", state: { messages: ["user(介绍 SSE)", "assistant(服务器推送)"], count: 2 }, file: "src/main.ts", source: "const assistant = await collectAssistantMessage(stream, onText);\nmessages.push(assistant);\nprocess.stdout.write(\"\\n\");" },
+    ],
+  },
+  3: {
+    title: "逐帧检查模型事件流",
+    description: "统一事件推进共享 partial，终端不再理解 DeepSeek JSON。",
+    nodes: ["Provider", "API", "Model Event", "Partial", "Terminal"],
+    steps: [
+      { title: "选择 Provider 与 Model", detail: "DeepSeek 组合 Chat Completions API。", node: 0, output: "$ nano-pi \"介绍 SSE\"\n", state: { provider: "deepseek", model: "deepseek-flash", api: "chat-completions" }, file: "src/providers/deepseek.ts", source: "export const deepSeekProvider: ModelProvider = {\n  id: \"deepseek\",\n  baseUrl: \"https://api.deepseek.com\",\n  defaultModel: { id: \"deepseek-flash\", api: \"chat-completions\" },\n  api: chatCompletionsApi,\n};" },
+      { title: "发出 start", detail: "HTTP 响应通过检查后，创建空的共享 partial。", node: 2, output: "$ nano-pi \"介绍 SSE\"\n", state: { type: "start", partial: { role: "assistant", text: "" } }, file: "src/stream.ts", source: "const block: TextContent = { type: \"text\", text: \"\" };\nconst partial: AssistantMessage = { role: \"assistant\", content: [block] };\nyield { type: \"start\", partial };" },
+      { title: "第一个 text_delta", detail: "事件携带 delta，并把同一段写入 partial。", node: 3, output: "$ nano-pi \"介绍 SSE\"\n服务", state: { type: "text_delta", delta: "服务", partial: { role: "assistant", text: "服务" } }, file: "src/stream.ts", source: "if (event.type === \"text\") {\n  block.text += event.text;\n  yield { type: \"text_delta\", delta: event.text, partial };\n}" },
+      { title: "第二个 text_delta", detail: "UI 只渲染 delta，模型层负责累积状态。", node: 4, output: "$ nano-pi \"介绍 SSE\"\n服务器推送", state: { type: "text_delta", delta: "器推送", partial: { role: "assistant", text: "服务器推送" } }, file: "src/main.ts", source: "for await (const event of streamModel(messages, provider, options)) {\n  if (event.type === \"text_delta\") {\n    process.stdout.write(event.delta);\n  }\n}" },
+      { title: "发出 done", detail: "done 携带最终 Message，随后才进入历史。", node: 2, output: "$ nano-pi \"介绍 SSE\"\n服务器推送\n", state: { type: "done", message: { role: "assistant", content: [{ type: "text", text: "服务器推送" }] } }, file: "src/stream.ts → src/main.ts", source: "// stream.ts\nyield { type: \"done\", message: partial };\n\n// main.ts\nif (event.type === \"done\") messages.push(event.message);" },
+    ],
+  },
+};
+
+const { order } = Astro.props as { order: number };
+const demo = demos[order];
+---
+
+{demo && (
+  <section class="runtime-demo" data-runtime-demo data-demo={JSON.stringify(demo)} aria-label={`Chapter ${order} 运行演示`}>
+    <header class="runtime-demo-header">
+      <div>
+        <span class="runtime-eyebrow">INTERACTIVE TRACE</span>
+        <h3>{demo.title}</h3>
+        <p>{demo.description}</p>
+      </div>
+      <div class="runtime-controls" aria-label="演示控制">
+        <button class="runtime-primary" type="button" data-demo-play aria-label="播放演示">
+          <span data-play-icon aria-hidden="true">▶</span><span data-play-label>运行</span>
+        </button>
+        <button type="button" data-demo-step>单步</button>
+        <button type="button" data-demo-reset>重置</button>
+        <label><span>速度</span><select data-demo-speed aria-label="演示速度"><option value="1200">慢</option><option value="700" selected>正常</option><option value="350">快</option></select></label>
+      </div>
+    </header>
+
+    <div class="runtime-stage">
+      <div class="runtime-flow" aria-label="模块流程">
+        {demo.nodes.map((node, index) => (
+          <div class="runtime-node" data-demo-node={index}>
+            <span>{String(index + 1).padStart(2, "0")}</span><strong>{node}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div class="runtime-grid">
+        <div class="runtime-terminal">
+          <div class="runtime-window-bar"><i></i><i></i><i></i><span>nano-pi — zsh</span></div>
+          <pre data-demo-terminal aria-live="polite"><code>点击“运行”观察完整流程。</code></pre>
+        </div>
+        <div class="runtime-inspector">
+          <div class="runtime-inspector-title"><span><i aria-hidden="true">{"{ }"}</i>当前状态</span><code data-demo-count>0/{demo.steps.length}</code></div>
+          <pre data-demo-state><code>{JSON.stringify({ status: "ready" }, null, 2)}</code></pre>
+        </div>
+      </div>
+
+      <div class="runtime-source">
+        <div class="runtime-source-title"><span>对应源码</span><code data-demo-file>选择一个步骤</code></div>
+        <pre data-demo-source><code>// 点击“运行”或时间线步骤，查看当前阶段执行的关键代码。</code></pre>
+      </div>
+
+      <div class="runtime-timeline">
+        <div class="runtime-progress" aria-hidden="true"><span data-demo-progress></span></div>
+        <ol>
+          {demo.steps.map((step, index) => (
+            <li data-demo-event={index}><button type="button"><span>{index + 1}</span><strong>{step.title}</strong><small>{step.detail}</small></button></li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  </section>
+)}
+
+<script>
+  type ClientDemo = {
+    nodes: string[];
+    steps: Array<{ title: string; detail: string; node: number; output: string; state: Record<string, unknown>; file: string; source: string }>;
+  };
+  document.querySelectorAll<HTMLElement>("[data-runtime-demo]").forEach((root) => {
+    const demo = JSON.parse(root.dataset.demo ?? "{}") as ClientDemo;
+    const terminal = root.querySelector<HTMLElement>("[data-demo-terminal]");
+    const state = root.querySelector<HTMLElement>("[data-demo-state]");
+    const count = root.querySelector<HTMLElement>("[data-demo-count]");
+    const file = root.querySelector<HTMLElement>("[data-demo-file]");
+    const source = root.querySelector<HTMLElement>("[data-demo-source]");
+    const progress = root.querySelector<HTMLElement>("[data-demo-progress]");
+    const play = root.querySelector<HTMLButtonElement>("[data-demo-play]");
+    const playLabel = root.querySelector<HTMLElement>("[data-play-label]");
+    const playIcon = root.querySelector<HTMLElement>("[data-play-icon]");
+    const speed = root.querySelector<HTMLSelectElement>("[data-demo-speed]");
+    const nodes = [...root.querySelectorAll<HTMLElement>("[data-demo-node]")];
+    const events = [...root.querySelectorAll<HTMLElement>("[data-demo-event]")];
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let index = -1;
+    let timer: number | undefined;
+
+    const sourceTokens: Record<string, string> = {
+      "准备输入": "const prompt", "发送请求": "await request", "缓冲网络分片": "buffer +=",
+      "解析第一段文本": "return { type", "继续流式输出": "yield event.text", "确认完整结束": "[DONE]",
+      "创建 user Message": "return { role", "构建消息历史": "const messages", "转换请求格式": "content: textOf",
+      "积累第一段": "block.text +=", "积累第二段": "block.text +=", "追加完整回复": "messages.push",
+      "选择 Provider 与 Model": "defaultModel", "发出 start": "yield { type", "第一个 text_delta": "block.text +=",
+      "第二个 text_delta": "process.stdout.write", "发出 done": "yield { type",
+    };
+    const stateKeys: Record<string, string[]> = {
+      "准备输入": ["prompt"], "发送请求": ["method", "stream"], "缓冲网络分片": ["buffer", "completeEvent"],
+      "解析第一段文本": ["providerEvent"], "继续流式输出": ["rendered"], "确认完整结束": ["complete"],
+      "创建 user Message": ["role", "content"], "构建消息历史": ["messages"], "转换请求格式": ["content", "stream"],
+      "积累第一段": ["content"], "积累第二段": ["content"], "追加完整回复": ["messages", "count"],
+      "选择 Provider 与 Model": ["provider", "model", "api"], "发出 start": ["type", "partial"],
+      "第一个 text_delta": ["delta", "partial"], "第二个 text_delta": ["delta", "partial"], "发出 done": ["type", "message"],
+    };
+    const escapeHtml = (value: string) => value
+      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+    const sourceHtml = (step: ClientDemo["steps"][number]) => {
+      const lines = [`// ${step.detail}`, ...step.source.split("\n")];
+      const target = sourceTokens[step.title] ?? "";
+      const focus = Math.max(1, lines.findIndex((line) => line.includes(target)));
+      return lines.map((line, lineIndex) => {
+        let painted = escapeHtml(line);
+        if (line.trimStart().startsWith("//")) {
+          painted = `<span class="code-comment">${painted}</span>`;
+        } else {
+          painted = painted
+            .replace(/(&quot;.*?&quot;)/g, '<span class="code-string">$1</span>')
+            .replace(/\b(const|let|return|if|for|await|yield|export|function)\b/g, '<span class="code-keyword">$1</span>');
+        }
+        return `<span class="code-line${lineIndex === focus ? " is-focus" : ""}"><i>${lineIndex + 1}</i><b>${painted || " "}</b></span>`;
+      }).join("");
+    };
+    const stateHtml = (step: ClientDemo["steps"][number]) => {
+      const keys = stateKeys[step.title] ?? [];
+      return JSON.stringify(step.state, null, 2).split("\n").map((line, lineIndex) => {
+        const focused = keys.some((key) => line.includes(`"${key}"`));
+        const painted = escapeHtml(line)
+          .replace(/(&quot;[^&]*?&quot;)(?=\s*:)/g, '<span class="json-key">$1</span>')
+          .replace(/(:\s*)(&quot;.*?&quot;)/g, '$1<span class="json-string">$2</span>')
+          .replace(/\b(true|false|null)\b/g, '<span class="json-literal">$1</span>');
+        return `<span class="state-line${focused ? " is-focus" : ""}"><i>${lineIndex + 1}</i><b>${painted}</b></span>`;
+      }).join("");
+    };
+
+    const animateUpdate = (element: HTMLElement | null) => {
+      if (!element || reduceMotion) return;
+      element.animate(
+        [{ opacity: .45, transform: "translateY(4px)" }, { opacity: 1, transform: "translateY(0)" }],
+        { duration: 220, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+      );
+    };
+
+    const setPlaying = (playing: boolean) => {
+      if (playLabel) playLabel.textContent = playing ? "暂停" : "运行";
+      if (playIcon) playIcon.textContent = playing ? "Ⅱ" : "▶";
+      play?.setAttribute("aria-label", playing ? "暂停演示" : "播放演示");
+      root.dataset.playing = String(playing);
+    };
+
+    const render = (next: number) => {
+      index = Math.max(-1, Math.min(next, demo.steps.length - 1));
+      const step = demo.steps[index];
+      if (terminal) terminal.textContent = step?.output ?? "点击“运行”观察完整流程。";
+      if (state) {
+        state.innerHTML = step
+          ? stateHtml(step)
+          : '<span class="state-empty">{ <span class="json-key">&quot;status&quot;</span>: <span class="json-string">&quot;ready&quot;</span> }</span>';
+      }
+      if (count) count.textContent = `${index + 1}/${demo.steps.length}`;
+      if (file) file.textContent = step?.file ?? "选择一个步骤";
+      if (source) {
+        source.innerHTML = step
+          ? sourceHtml(step)
+          : '<span class="source-empty">// 点击“运行”或时间线步骤，查看当前阶段执行的关键代码。</span>';
+      }
+      if (progress) progress.style.transform = `scaleX(${(index + 1) / demo.steps.length})`;
+      nodes.forEach((node, nodeIndex) => {
+        node.classList.toggle("active", nodeIndex === step?.node);
+        node.classList.toggle("passed", Boolean(step && nodeIndex < step.node));
+      });
+      events.forEach((event, eventIndex) => {
+        event.classList.toggle("active", eventIndex === index);
+        event.classList.toggle("complete", eventIndex < index);
+      });
+      animateUpdate(terminal);
+      animateUpdate(state);
+      animateUpdate(source);
+      events[index]?.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+    };
+
+    const stop = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = undefined;
+      setPlaying(false);
+    };
+
+    const advance = () => {
+      if (index >= demo.steps.length - 1) {
+        stop();
+        return;
+      }
+      render(index + 1);
+      timer = window.setTimeout(advance, Number(speed?.value ?? 700));
+    };
+
+    play?.addEventListener("click", () => {
+      if (timer) return stop();
+      if (index >= demo.steps.length - 1) render(-1);
+      setPlaying(true);
+      advance();
+    });
+    root.querySelector("[data-demo-step]")?.addEventListener("click", () => {
+      stop();
+      render(index >= demo.steps.length - 1 ? 0 : index + 1);
+    });
+    root.querySelector("[data-demo-reset]")?.addEventListener("click", () => { stop(); render(-1); });
+    speed?.addEventListener("change", () => { if (timer) { stop(); setPlaying(true); advance(); } });
+    events.forEach((event, eventIndex) => event.querySelector("button")?.addEventListener("click", () => { stop(); render(eventIndex); }));
+  });
+</script>
