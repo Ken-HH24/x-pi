@@ -107,3 +107,9 @@ Chapter 5 起，Session 保留完整 record，`buildContext()` 负责选择参�
 状态：已接受。
 
 Chapter 6 起，Agent 层拥有 user 提交、Context 构建、一次模型调用和完整 assistant 提交，并发出 Agent、turn 与 message 生命周期事件。CLI 不直接消费模型流，也不负责 Session 提交；它只从 `message_update` 读取文本 delta。模型 partial 可以保持共享可变语义，但 Agent 事件携带事件时刻的消息快照，避免历史事件被后续增量改写。
+
+## D-019：工具参数只在完整结束时结构化
+
+状态：已接受。
+
+Chapter 7 中 provider 只产出按 index 标识的 tool call 原子增量，模型流负责跨 SSE chunk 累积原始 arguments 字符串。最终只接受 JSON object，并在 `toolcall_end` 前写入结构化 `ToolCallContent`；半截参数不会进入 Session。schema 验证、执行与 tool result 属于 Chapter 8 的执行边界，不混入协议组装。

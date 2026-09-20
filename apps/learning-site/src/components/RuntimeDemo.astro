@@ -97,6 +97,21 @@ const demos: Record<number, Demo> = {
       { title: "结束 Agent run", detail: "agent_end 只返回本次 run 新产生的 user 与 assistant。", node: 4, output: "$ nano-pi \"解释 Agent Loop\"\nAgent Loop\n", state: { event: "agent_end", newMessages: ["user", "assistant"], status: "done" }, file: "src/agent.ts", source: "yield { type: \"agent_end\", messages: emittedMessages };\nreturn modelEvent.message;" },
     ],
   },
+  7: {
+    title: "组装一次流式 Tool Call",
+    description: "重放跨两个 SSE chunk 的 read_file 参数，观察声明、增量、结构化完成与持久化边界。",
+    nodes: ["Tool", "DeepSeek", "Provider", "Model Stream", "Agent"],
+    steps: [
+      { title: "声明 read_file", detail: "CLI 提供工具名、说明和 JSON Schema；本章尚无执行函数。", node: 0, output: "$ nano-pi \"读取 README.md\"\n", state: { tool: "read_file", required: ["path"], executable: false }, file: "src/main.ts", source: "tools: [{\n  name: \"read_file\",\n  description: \"读取工作区内的 UTF-8 文本文件\",\n  parameters: { type: \"object\", required: [\"path\"] },\n}]" },
+      { title: "转换厂商请求", detail: "provider 把规范 Tool 包装成 OpenAI-compatible function tool。", node: 1, output: "$ nano-pi \"读取 README.md\"\n", state: { type: "function", name: "read_file", stream: true }, file: "src/providers/deepseek.ts", source: "return tools.map((tool) => ({\n  type: \"function\",\n  function: tool,\n}));" },
+      { title: "接收首个调用片段", detail: "第一片带 index、id、name 和半段 arguments。", node: 2, output: "$ nano-pi \"读取 README.md\"\n", state: { index: 0, id: "call_7", name: "read_file", argumentsDelta: "{\"path\":" }, file: "src/providers/deepseek.ts", source: "events.push({\n  type: \"tool_call\", index, id, name,\n  argumentsDelta: argumentsDelta ?? \"\",\n});" },
+      { title: "开始内容块", detail: "模型流按 index 建立 accumulator，并用 contentIndex 暴露位置。", node: 3, output: "$ nano-pi \"读取 README.md\"\n", state: { event: "toolcall_start", providerIndex: 0, contentIndex: 0, arguments: {} }, file: "src/stream.ts", source: "content.push(block);\ncalls.set(event.index, call);\nyield { type: \"toolcall_start\", contentIndex, partial };" },
+      { title: "累积参数片段", detail: "第二片通过相同 index 追加，原始 JSON 此时才完整。", node: 3, output: "$ nano-pi \"读取 README.md\"\n", state: { event: "toolcall_delta", delta: "\"README.md\"}", rawArguments: "{\"path\":\"README.md\"}" }, file: "src/stream.ts", source: "call.rawArguments += event.argumentsDelta;\nyield {\n  type: \"toolcall_delta\",\n  contentIndex: call.contentIndex, delta: event.argumentsDelta, partial,\n};" },
+      { title: "形成结构化调用", detail: "done 时解析完整 JSON object，并发出 authoritative toolcall_end。", node: 3, output: "$ nano-pi \"读取 README.md\"\n", state: { event: "toolcall_end", toolCall: { id: "call_7", name: "read_file", arguments: { path: "README.md" } } }, file: "src/stream.ts", source: "const args = JSON.parse(call.rawArguments || \"{}\");\ncall.block.arguments = args;\nyield { type: \"toolcall_end\", toolCall: call.block, partial };" },
+      { title: "提升 Agent 更新", detail: "Agent 复制当前消息快照；CLI 只消费最终工具事件。", node: 4, output: "$ nano-pi \"读取 README.md\"\n\n[tool call] read_file {\"path\":\"README.md\"}", state: { event: "message_update", modelEvent: "toolcall_end", executed: false }, file: "src/agent.ts → src/main.ts", source: "yield { type: \"message_update\", message: snapshot(partial), modelEvent };\n// CLI\nprocess.stdout.write(`\\n[tool call] ${name} ${JSON.stringify(arguments)}`);" },
+      { title: "提交完整消息", detail: "结构化 assistant 被保存；工具结果仍为空，证明执行尚未发生。", node: 4, output: "$ nano-pi \"读取 README.md\"\n\n[tool call] read_file {\"path\":\"README.md\"}\n", state: { assistantCommitted: true, contentType: "toolCall", toolResults: [], nextTurn: false }, file: "src/agent.ts", source: "await session.append(modelEvent.message);\nyield { type: \"message_end\", message: modelEvent.message };\nyield { type: \"turn_end\", message: modelEvent.message, toolResults: [] };" },
+    ],
+  },
 };
 
 const { order } = Astro.props as { order: number };
@@ -201,6 +216,10 @@ if (order > 0 && !demo) {
       "构建本轮 Context": "buildContext", "开始 assistant 消息": "modelEvent.type",
       "提升第一个增量": "snapshot", "CLI 渲染第二个增量": "process.stdout.write",
       "结束 message 与 turn": "session.append", "结束 Agent run": "agent_end",
+      "声明 read_file": "tools:", "转换厂商请求": "return tools.map",
+      "接收首个调用片段": "events.push", "开始内容块": "content.push",
+      "累积参数片段": "rawArguments +=", "形成结构化调用": "JSON.parse",
+      "提升 Agent 更新": "message_update", "提交完整消息": "session.append",
     };
     const stateKeys: Record<string, string[]> = {
       "准备输入": ["prompt"], "发送请求": ["method", "stream"], "缓冲网络分片": ["buffer", "completeEvent"],
@@ -220,6 +239,10 @@ if (order > 0 && !demo) {
       "构建本轮 Context": ["contextMessages", "llmMessages"], "开始 assistant 消息": ["event", "text"],
       "提升第一个增量": ["delta", "snapshot"], "CLI 渲染第二个增量": ["delta", "cliKnowsSse"],
       "结束 message 与 turn": ["events", "assistantCommitted", "toolResults"], "结束 Agent run": ["event", "newMessages", "status"],
+      "声明 read_file": ["tool", "required", "executable"], "转换厂商请求": ["type", "name", "stream"],
+      "接收首个调用片段": ["index", "id", "argumentsDelta"], "开始内容块": ["event", "providerIndex", "contentIndex"],
+      "累积参数片段": ["delta", "rawArguments"], "形成结构化调用": ["event", "toolCall"],
+      "提升 Agent 更新": ["event", "modelEvent", "executed"], "提交完整消息": ["assistantCommitted", "toolResults", "nextTurn"],
     };
     const escapeHtml = (value: string) => value
       .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");

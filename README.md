@@ -66,7 +66,7 @@ docs/               进度、源码地图和设计决策
 
 ## 当前进度
 
-当前完成 Chapter 6：由 Agent 层拥有一次 turn，并把模型流提升为稳定的 Agent 生命周期事件；CLI 只消费事件。下一步是 Chapter 7：加入 Tool Calling 协议。
+当前完成 Chapter 7：工具声明可以进入模型请求，流式 tool call 会被组装成结构化内容块并提升为 Agent 事件。下一步是 Chapter 8：执行工具并形成多轮循环。
 
 新会话开始时，先阅读 [docs/progress.md](docs/progress.md)，再阅读当前章节文档。
 
@@ -83,8 +83,8 @@ docs/               进度、源码地图和设计决策
 | 04 | Session 与 JSONL | 已完成 |
 | 05 | Context 构建与模型转换 | 已完成 |
 | 06 | 最小 Agent Loop | 已完成 |
-| 07 | Tool Calling 协议 | 待开始 |
-| 08 | 多轮工具循环 | 未开始 |
+| 07 | Tool Calling 协议 | 已完成 |
+| 08 | 多轮工具循环 | 待开始 |
 | 09 | CLI、取消与恢复 | 未开始 |
 | 10 | Session Tree 与分支 | 未开始 |
 | 11 | Compaction | 未开始 |

@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 07-tool-calling
+current_chapter: 08-tool-loop
 status: ready
-last_completed: 06-agent-loop
-next_action: 扩展 Message 与模型事件，接收并组装结构化 tool call
+last_completed: 07-tool-calling
+next_action: 定义 tool result Message，执行工具并让 Agent 推进多个 turn
 runtime:
   node: 24.18.1
   pnpm: 11.18.0
@@ -60,20 +60,25 @@ decisions:
 - [x] 建立最小 Agent、turn 与 message 生命周期事件。
 - [x] CLI 改为只消费 Agent 事件，不直接编排模型流。
 - [x] 添加 Chapter 6 离线测试、独立快照、流程图与完整教程。
+- [x] 核对 Pi 当前 tool call 内容块、流事件与 provider 转换。
+- [x] 扩展 assistant Message，使其能保存结构化 tool call。
+- [x] 从 DeepSeek 流中按 index 组装跨 chunk 的 tool call 参数。
+- [x] 通过模型与 Agent 事件暴露 tool call 的开始、增量和最终状态。
+- [x] 添加 Chapter 7 离线测试、独立快照、流程图、完整教程与 Runtime Demo。
 
 ## 下一步验收条件
 
-Chapter 7 只有满足以下条件才算完成：
+Chapter 8 只有满足以下条件才算完成：
 
-- [ ] 核对 Pi 当前 tool call 内容块、流事件与 provider 转换。
-- [ ] 扩展 assistant Message，使其能保存结构化 tool call。
-- [ ] 从 DeepSeek 流中正确组装跨 chunk 的 tool call 参数。
-- [ ] Agent 事件能暴露 tool call 的增量和最终状态。
-- [ ] 添加离线测试、完整讲解和 Chapter 7 快照。
+- [ ] 定义 tool result Message 与 provider 请求转换。
+- [ ] 建立工具注册、参数校验和执行边界。
+- [ ] Agent 能在 tool call 后执行工具并开始下一 turn。
+- [ ] 工具失败能成为模型可见的结果，而不是破坏整个事件流。
+- [ ] 添加离线测试、完整讲解和 Chapter 8 快照。
 
 ## 暂不处理
 
-- 工具调用和 Session 持久化留到后续章节。
+- 实际工具执行和 tool result 留到 Chapter 8。
 - Harness 的 memory 和 sandbox 要等 Agent Loop 与扩展边界稳定后再开始。
 - 暂不为了“未来可能支持多个 provider”建立复杂框架。
 
@@ -82,7 +87,7 @@ Chapter 7 只有满足以下条件才算完成：
 下一位执行者应先检查工作树，然后阅读：
 
 1. `README.md`
-2. `chapters/06-agent-loop/README.md`
+2. `chapters/07-tool-calling/README.md`
 3. `docs/source-map.md`
 4. `docs/decisions.md`
 5. `docs/chapter-template.md`

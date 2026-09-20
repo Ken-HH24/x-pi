@@ -1,6 +1,6 @@
 # Pi 源码学习地图
 
-更新时间：2026-09-19。
+更新时间：2026-09-20。
 
 本文件不是永久正确的架构说明，而是 `x-pi` 学习过程中持续校准的索引。Pi 主仓库变化很快；进入每个章节时仍需重新核对相关源码。
 
@@ -55,6 +55,12 @@ Nano Pi 保留这一职责顺序但继续使用线性历史：`Session.records` 
 Pi 当前 `AgentEvent` 分为 Agent、turn、message 和工具执行四组生命周期。新 prompt 的基础顺序是 `agent_start → turn_start → prompt message_start/end → assistant message_start/update/end → turn_end → agent_end`；一次 turn 包含一条 assistant 响应以及由它触发的工具调用与结果。模型流的 partial 会进入当前 Context，并在更新时被替换为最新响应。
 
 Nano Pi 实现无工具的单-turn 子集：`runAgent()` 提交 user、构建 Context、调用模型并只提交 done assistant，再发出稳定的 Agent 事件。`turn_end.toolResults` 当前恒为 `[]`，为后续工具循环保留形状；CLI 只读取 `message_update.modelEvent.delta`。与模型层共享 partial 不同，Agent 事件保存当时的消息快照，避免旧事件被后续 delta 改写。错误合成、工具、多 turn、steering 与 follow-up 仍留给后续章节。
+
+### Chapter 7：Tool Calling 协议
+
+Pi 当前 `packages/ai` 的 assistant 内容可包含 tool call，流式事件使用 `toolcall_start`、`toolcall_delta` 和 `toolcall_end`，并通过 `contentIndex` 把事件关联到内容数组中的块。不同块的事件允许交错；最终 tool call 包含 `id`、`name` 和结构化 `arguments`，但 end 本身不代表已经按工具 schema 验证。`packages/agent` 再把这些模型事件包装进 `message_update`，工具执行使用另一组生命周期事件。
+
+Nano Pi 实现 DeepSeek Chat Completions 的 function tool 子集：应用侧 `Tool` 声明在 provider 边界转换，`delta.tool_calls[index]` 被展开成原子 ProviderEvent，模型流以 Map 按 index 累积原始参数字符串，并在 done 时严格解析为 JSON object。模型与 Agent 事件均暴露 start/delta/end；完整 assistant tool call 可以持久化和恢复，但实际执行、schema 校验、tool result 和下一 turn 明确留到 Chapter 8。
 
 ### 模型消息与 Agent 消息分离
 
