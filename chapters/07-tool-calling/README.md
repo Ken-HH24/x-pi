@@ -126,9 +126,71 @@ DeepSeek 的 `delta.tool_calls` 是数组，一次 SSE 事件可能包含多个�
 
 通常第一片携带 `index / id / name`，后续片只带相同 `index` 和新的参数字符串。缺失的后续字段不是错误；但第一次看到某个 index 时必须有 id 和 name，否则无法建立稳定内容块。
 
-### 4. 用 Map 组装交错的参数流
+### 4. 普通文本和 tool_call 是怎么区分的
 
-`src/stream.ts` 用 `Map<number, accumulator>` 按 provider index 保存状态：
+两种数据都来自模型的 SSE 响应，但 DeepSeek 放在不同字段里。普通回答放在 `choices[0].delta.content`；工具调用放在 `choices[0].delta.tool_calls`。provider 读取字段后分别生成 `text` 和 `tool_call` 事件。随后 `streamModel()` 根据事件的 `type` 进入不同分支：文本追加到文本块，调用则按 `index` 累积参数。
+
+例如，普通回答的一个 SSE 数据事件可能是：
+
+```json
+{"choices":[{"delta":{"content":"README.md 是项目说明文件。"}}]}
+```
+
+provider 会生成 `{ type: "text", text: "README.md 是项目说明文件。" }`，stream 收到它后走文本分支：
+
+```ts
+if (event.type === "text") {
+  textBlock.text += event.text;
+  yield { type: "text_delta", delta: event.text, partial };
+}
+```
+
+最终 assistant 内容中对应一个文本块：
+
+```ts
+{ type: "text", text: "README.md 是项目说明文件。" }
+```
+
+工具调用则可能分成两个 SSE 数据事件。第一片带调用身份和部分参数：
+
+```json
+{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_7","type":"function","function":{"name":"read_file","arguments":"{\"path\":"}}]}}]}
+```
+
+第二片继续补参数，通常不再重复 id 和 name：
+
+```json
+{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"README.md\"}"}}]}}]}
+```
+
+provider 将每个数组元素解析成 `{ type: "tool_call", index, id?, name?, argumentsDelta }`。stream 判断 `event.type === "tool_call"` 后按 `index` 找到同一次调用，把参数片段拼成 `{"path":"README.md"}`；收到 `[DONE]` 后才解析 JSON，得到最终内容块：
+
+```ts
+{
+  type: "toolCall",
+  id: "call_7",
+  name: "read_file",
+  arguments: { path: "README.md" },
+}
+```
+
+所以判断依据是响应字段和解析出的事件类型，不是根据模型说了什么来猜。一个 SSE chunk 也可能同时含 `content` 和 `tool_calls`；provider 会按顺序生成两个事件，stream 分别处理，因此一次响应可以既有文本块，也有工具调用块。具体解析在 `src/providers/deepseek.ts`，按事件组装内容块的逻辑在 `src/stream.ts`。
+
+### 5. 用 Map 保存每个调用的组装状态
+
+一次回答可能包含多个工具调用，而且它们的参数片段可能交错到达。比如模型先开始调用 `read_file`，接着开始调用 `search`，然后才分别补齐两个调用的参数：
+
+| 到达的增量 | Map 中发生的变化 | 发出的事件与当前消息 |
+| --- | --- | --- |
+| `index=0, id=call_A, name=read_file, arguments='{"path":'` | 为 `index=0` 新建状态，内容块放到 `content[0]`，原始参数为 `{"path":` | `toolcall_start(contentIndex=0)`，随后 `toolcall_delta(contentIndex=0, delta='{"path":')`。partial 中已有 `read_file` 块，但 `arguments` 仍为 `{}`。 |
+| `index=1, id=call_B, name=search, arguments='{"query":'` | 为 `index=1` 新建另一份状态，内容块放到 `content[1]`，原始参数为 `{"query":` | `toolcall_start(contentIndex=1)`，随后 `toolcall_delta(contentIndex=1, delta='{"query":')`。partial 中现在有两个调用块。 |
+| `index=0, arguments='"README.md"}'` | 用 `index=0` 找到 `call_A`，只把这段追加到它的原始参数 | `toolcall_delta(contentIndex=0, delta='"README.md"}')`。虽然上一个事件属于 `call_B`，这段仍会追加到 `read_file`。 |
+| `index=1, arguments='"bug"}'` | 用 `index=1` 找到 `call_B`，追加它自己的参数 | `toolcall_delta(contentIndex=1, delta='"bug"}')`。 |
+| 收到 `[DONE]` | 分别解析两份完整 JSON，并写入各自内容块 | 两个 `toolcall_end` 分别带 `contentIndex=0` 和 `contentIndex=1`；参数对象分别是 `{ path: "README.md" }` 和 `{ query: "bug" }`。 |
+
+这里有两个编号，各有用途：provider 的 `index` 用来查找 Map 里同一个调用的累积状态；`contentIndex` 是该调用块在 assistant `content` 数组中的位置。事件可以交错，所以消费者应看事件携带的 `contentIndex` 来定位内容块，不能假定两个 `toolcall_start` 和 `toolcall_end` 之间只有同一个调用的事件。
+
+核心状态大致如下，省略了错误检查和事件对象的其他字段：
 
 ```ts
 const calls = new Map<number, {
@@ -136,13 +198,27 @@ const calls = new Map<number, {
   rawArguments: string;
   contentIndex: number;
 }>();
+
+// 第一次看见 index=0 时，创建调用块并记住它在 content 中的位置。
+// 此时 rawArguments 还只是 JSON 的一部分，block.arguments 暂时是 {}。
+calls.set(0, {
+  block: { type: "toolCall", id: "call_A", name: "read_file", arguments: {} },
+  rawArguments: "{\"path\":",
+  contentIndex: 0,
+});
+
+// 后续片段带着 index=0 回来：只更新这次调用的原始参数，并发出新片段。
+const call = calls.get(0)!;
+call.rawArguments += "\"README.md\"}";
+yield { type: "toolcall_delta", contentIndex: call.contentIndex,
+  delta: "\"README.md\"}", partial };
+
+// 收到 [DONE] 才 JSON.parse(call.rawArguments)，再写入 call.block.arguments。
 ```
 
-第一次出现 index 时，把参数暂设为 `{}` 的 tool call 块加入共享 partial，并发出 `toolcall_start`。每个非空参数片段追加到 `rawArguments`，同时发出 `toolcall_delta`；事件的 `delta` 适合日志或增量 UI，共享 `partial` 则表示当前 assistant 状态。
+`delta` 和 `partial` 不是两份相同的数据：`delta` 是这次新到达的参数字符串，例如 `"README.md"}`，适合直接追加到日志或流式界面；`partial` 是当前正在增长的 assistant 消息对象，里面有目前已创建的内容块。它是共享对象，不是冻结的历史快照。按本章的实现，未解析完成的参数保存在 Map 的 `rawArguments`，因此 `toolcall_delta` 期间 partial 里的 `arguments` 仍是 `{}`；参数只在完整 JSON 解析成功后写入块，并通过 `toolcall_end` 提供结构化结果。Agent 层的 `snapshot()` 会复制消息，避免已经发出的 Agent 事件被这个共享对象后续的变化改写。
 
-采用 Map 而不是单个字符串，是因为两个 tool call 的 chunk 可以交错。消费者依赖 `contentIndex` 找内容块，也不能假定某个 start 到 end 之间没有其他块的事件。
-
-### 5. 结束时严格形成结构化参数
+### 6. 结束时严格形成结构化参数
 
 收到 provider `done` 后，stream 按 `contentIndex` 顺序结束所有调用：
 
@@ -157,11 +233,56 @@ yield { type: "toolcall_end", contentIndex, toolCall: block, partial };
 
 空参数规范化为 `{}`；损坏 JSON、数组、字符串或 null 都会失败，不产生 `done`，也不会提交 partial assistant。这里只验证“是 JSON object”，工具 schema 的参数校验属于执行前职责，留到 Chapter 8。
 
-### 6. 把全部模型增量提升为 Agent 更新
+### 7. 把全部模型增量提升为 Agent 更新
 
-Chapter 6 的 `message_update` 只接受 `text_delta`。现在它接受 start/done 之外的全部模型事件，因此工具开始、参数增量和最终调用都会形成 Agent `message_update`。
+这一节的变化发生在 **Agent 层**：模型流现在不仅有文本增量，也有 tool call 的开始、参数片段和完成事件；Agent 要把这些模型事件放进统一的 `message_update` 外壳，消费者才能在同一条 run / turn / message 生命周期里观察它们。
 
-`snapshot()` 会复制 tool call 的 `arguments`，防止后续完成解析时改写先前事件。CLI 分别处理文本和 `toolcall_end`；它仍不知道 SSE、DeepSeek 字段或累积 Map。
+Chapter 6 的类型把更新事件限定为文本：
+
+```ts
+type TextDeltaEvent = Extract<ModelEvent, { type: "text_delta" }>;
+// message_update.modelEvent 只能是 text_delta
+```
+
+Chapter 7 改为排除生命周期两端的 `start` 和 `done`，保留其余模型事件：
+
+```ts
+type UpdateModelEvent = Exclude<ModelEvent, { type: "start" } | { type: "done" }>;
+// 因而包括 text_delta、toolcall_start、toolcall_delta、toolcall_end
+```
+
+Agent 对这些事件的处理规则很简单：模型流的 `start` 转成 Agent 的 `message_start`；每个中间事件（文本或 tool call）转成 `message_update`；模型流的 `done` 则提交完整 assistant message，并依次发出 `message_end`、`turn_end`、`agent_end`。例如用户请求读取文件时，关键事件顺序如下：
+
+| 模型流事件 | Agent 发出的事件 | 读者可以观察到什么 |
+| --- | --- | --- |
+| `start` | `message_start` | assistant 消息开始，内容暂时为空 |
+| `toolcall_start`, `contentIndex=0` | `message_update`, `modelEvent.type="toolcall_start"` | assistant 开始生成 `content[0]` 的工具调用 |
+| `toolcall_delta`, `delta='{"path":'` | `message_update`, `modelEvent.type="toolcall_delta"` | 收到一段参数字符串；JSON 还不完整 |
+| `toolcall_delta`, `delta='"README.md"}'` | `message_update`, `modelEvent.type="toolcall_delta"` | 参数片段已拼全，但仍等流结束后解析 |
+| `toolcall_end`, 参数为 `{ path: "README.md" }` | `message_update`, `modelEvent.type="toolcall_end"` | 得到完整结构化调用 |
+| `done` | `message_end` → `turn_end` → `agent_end` | assistant 消息保存；本章 `toolResults` 仍为空 |
+
+`message_update` 里有两个容易混淆的字段。`modelEvent` 保留这一次具体的模型事件，例如 `toolcall_delta` 及其新增片段；`message` 则是 Agent 此刻的 assistant 消息副本，供通用消费者读取当前内容。`snapshot()` 会复制内容块和其中的 `arguments` 对象，所以之后把完整参数写入原始 partial 时，已经发出的 Agent `message` 不会跟着改变。需要注意，`modelEvent.partial` 仍是模型流传来的共享对象；稳定副本是 Agent 事件的 `message` 字段。
+
+CLI 只看 Agent 事件，不处理 SSE、DeepSeek 字段或 `calls` Map。它只在 `message_update` 中再检查模型事件类型：文本事件打印新增文本；`toolcall_end` 打印工具名和完整参数。其他工具调用更新不打印，因此终端不会把半截 JSON 当成最终调用展示：
+
+```ts
+if (event.type === "message_update" && event.modelEvent.type === "text_delta") {
+  process.stdout.write(event.modelEvent.delta);
+} else if (event.type === "message_update" && event.modelEvent.type === "toolcall_end") {
+  process.stdout.write(
+    `\n[tool call] ${event.modelEvent.toolCall.name} ${JSON.stringify(event.modelEvent.toolCall.arguments)}`,
+  );
+}
+```
+
+因此这次输入最终显示为：
+
+```text
+[tool call] read_file {"path":"README.md"}
+```
+
+这行只说明 Agent 收到了完整调用请求。Chapter 7 没有执行 `read_file`，也没有生成工具结果，所以 `turn_end.toolResults` 仍是空数组；执行和发起下一轮模型请求留到 Chapter 8。
 
 ## 关键代码解释
 
