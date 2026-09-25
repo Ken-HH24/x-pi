@@ -62,6 +62,10 @@ Pi 当前 `packages/ai` 的 assistant 内容可包含 tool call，流式事件�
 
 Nano Pi 实现 DeepSeek Chat Completions 的 function tool 子集：应用侧 `Tool` 声明在 provider 边界转换，`delta.tool_calls[index]` 被展开成原子 ProviderEvent，模型流以 Map 按 index 累积原始参数字符串，并在 done 时严格解析为 JSON object。模型与 Agent 事件均暴露 start/delta/end；完整 assistant tool call 可以持久化和恢复，但实际执行、schema 校验、tool result 和下一 turn 明确留到 Chapter 8。
 
+### Chapter 8：多轮工具循环
+
+Pi 当前 `packages/agent/src/types.ts` 定义 `tool_execution_start` / `tool_execution_end`，并将一个 turn 描述为 assistant 消息、工具调用与结果；`agent-loop.ts` 在工具调用后把 ToolResultMessage 加入 Context，再决定是否进入下一轮。Nano Pi 用 `ToolRegistry` 配对厂商声明和执行函数，内置常用 schema 子集校验，按序执行工具，保存 `{ role: "tool", toolCallId, content, isError }`，provider 转为 DeepSeek 的 `tool_call_id`。本教学版限 `read_file` 示例与五次模型请求，不含 Pi 的并行模式、审批 hook、更新事件或完整 JSON Schema。
+
 ### 模型消息与 Agent 消息分离
 
 Pi Agent 允许应用自定义 `AgentMessage`，但调用模型前必须经过 `transformContext()` 和 `convertToLlm()`，最终只发送模型理解的消息。Nano Pi 会先从少量消息类型开始，但保留“存储/应用消息不等于 provider 请求格式”这一边界。

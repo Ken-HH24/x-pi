@@ -1,0 +1,11 @@
+data: {"choices":[{"delta":{"role":"assistant","content":null},"finish_reason":null}]}
+
+data: {"choices":[{"delta":{"content":"你"},"finish_reason":null}]}
+
+data: {"choices":[{"delta":{"content":"好"},"finish_reason":null}]}
+
+data: {"choices":[{"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+
+: fixture terminator

@@ -84,6 +84,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/config
 
+  labs/chapter-08:
+    dependencies:
+      '@x-pi/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+
   packages/agent-runtime: {}
 
   packages/config: {}

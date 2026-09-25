@@ -113,3 +113,9 @@ Chapter 6 起，Agent 层拥有 user 提交、Context 构建、一次模型调�
 状态：已接受。
 
 Chapter 7 中 provider 只产出按 index 标识的 tool call 原子增量，模型流负责跨 SSE chunk 累积原始 arguments 字符串。最终只接受 JSON object，并在 `toolcall_end` 前写入结构化 `ToolCallContent`；半截参数不会进入 Session。schema 验证、执行与 tool result 属于 Chapter 8 的执行边界，不混入协议组装。
+
+## D-020：工具结果进入消息历史并按序执行
+
+状态：已接受。
+
+Chapter 8 的工具结果使用厂商无关的 tool Message，保留 `toolCallId`、文本结果与 `isError`；Provider 转换成 DeepSeek `role: "tool"` 与 `tool_call_id`。Agent 以注册表校验并按 assistant 内容顺序执行调用，工具错误也成为模型可见结果。教学版只覆盖常用 JSON Schema 子集，`read_file` 限于工作区真实路径，每次 run 最多发起五次模型请求。

@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 08-tool-loop
+current_chapter: 09-cli-cancel-resume
 status: ready
-last_completed: 07-tool-calling
-next_action: 定义 tool result Message，执行工具并让 Agent 推进多个 turn
+last_completed: 08-tool-loop
+next_action: 学习 CLI 交互、取消传播和中断后的恢复行为
 runtime:
   node: 24.18.1
   pnpm: 11.18.0
@@ -65,20 +65,18 @@ decisions:
 - [x] 从 DeepSeek 流中按 index 组装跨 chunk 的 tool call 参数。
 - [x] 通过模型与 Agent 事件暴露 tool call 的开始、增量和最终状态。
 - [x] 添加 Chapter 7 离线测试、独立快照、流程图、完整教程与 Runtime Demo。
+- [x] 定义并持久化 tool result Message，并转换为 DeepSeek tool role 请求。
+- [x] 建立工具注册、常用 JSON Schema 子集验证与工作区 read_file 执行边界。
+- [x] Agent 顺序执行工具、把错误回传模型并继续后续 turn；每次 run 限制五次模型请求。
+- [x] 添加 Chapter 8 离线测试、独立快照、完整教程与 Runtime Demo。
 
 ## 下一步验收条件
 
-Chapter 8 只有满足以下条件才算完成：
+Chapter 9 继续围绕当前 CLI 实现取消传播和中断恢复，并补齐独立快照与学习演示。
 
-- [ ] 定义 tool result Message 与 provider 请求转换。
-- [ ] 建立工具注册、参数校验和执行边界。
-- [ ] Agent 能在 tool call 后执行工具并开始下一 turn。
-- [ ] 工具失败能成为模型可见的结果，而不是破坏整个事件流。
-- [ ] 添加离线测试、完整讲解和 Chapter 8 快照。
 
 ## 暂不处理
 
-- 实际工具执行和 tool result 留到 Chapter 8。
 - Harness 的 memory 和 sandbox 要等 Agent Loop 与扩展边界稳定后再开始。
 - 暂不为了“未来可能支持多个 provider”建立复杂框架。
 
