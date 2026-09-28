@@ -29,6 +29,8 @@ test("read_file accepts workspace relative files and rejects escapes", async () 
   await symlink(outside, join(root, "linked-out"), "dir");
   const tool = createReadFileTool(root);
   assert.equal(await tool.execute({ path: "nested/note.txt" }), "hello");
+  await assert.rejects(async () => tool.execute({ path: "" }), /non-empty/);
+  await assert.rejects(async () => tool.execute({ path: "   " }), /non-empty/);
   await assert.rejects(async () => tool.execute({ path: "../outside/secret.txt" }), /escapes the workspace/);
   await assert.rejects(async () => tool.execute({ path: join(outside, "secret.txt") }), /must be relative/);
   await assert.rejects(async () => tool.execute({ path: "linked-out/secret.txt" }), /escapes the workspace/);

@@ -178,6 +178,10 @@ test("agent exposes tool call deltas and persists the structured call", async ()
   assert.deepEqual(updates.map((event) => event.modelEvent.type), [
     "toolcall_start", "toolcall_delta", "toolcall_delta", "toolcall_end",
   ]);
+  const start = updates[0];
+  assert.deepEqual(start?.type === "message_update" && start.modelEvent.partial.content[0], {
+    type: "toolCall", id: "call_1", name: "read_file", arguments: {},
+  });
   const end = updates.at(-1);
   assert.deepEqual(
     end?.modelEvent.type === "toolcall_end" && end.modelEvent.toolCall,
@@ -223,6 +227,64 @@ test("tool failures become model-visible results and the loop continues", async 
   assert.equal(failed?.type === "tool_execution_end" && failed.result.isError, true);
   assert.equal(calls, 2);
   assert.equal((await Session.open(path)).messages.at(-2)?.role, "tool");
+});
+
+test("multiple tool calls persist ordered results before the next model turn", async () => {
+  const session = await Session.open(await temporarySession());
+  let requests = 0;
+  const fakeFetch: typeof fetch = async (_url, init) => {
+    requests++;
+    const request = JSON.parse(String(init?.body));
+    if (requests === 1) return response(
+      JSON.stringify({ choices: [{ delta: { tool_calls: [
+        { index: 0, id: "ok", function: { name: "echo", arguments: '{"value":"42"}' } },
+        { index: 1, id: "invalid", function: { name: "echo", arguments: '{}' } },
+        { index: 2, id: "unknown", function: { name: "missing", arguments: '{}' } },
+      ] } }] }),
+      "[DONE]",
+    );
+    assert.deepEqual(request.messages.map((message: { role: string }) => message.role),
+      ["user", "assistant", "tool", "tool", "tool"]);
+    assert.deepEqual(request.messages.slice(2).map((message: { tool_call_id: string }) => message.tool_call_id),
+      ["ok", "invalid", "unknown"]);
+    assert.equal(request.messages[2].content, "42");
+    return response('{"choices":[{"delta":{"content":"完成"}}]}', "[DONE]");
+  };
+  const registry = new ToolRegistry([{
+    name: "echo", description: "echo", parameters: {
+      type: "object", required: ["value"], properties: { value: { type: "string" } },
+    },
+    execute: (args) => args.value as string,
+  }]);
+  const events = await collectAgentEvents(session, "执行多个工具", fakeFetch, registry);
+  assert.equal(requests, 2);
+  assert.deepEqual(session.messages.filter((message) => message.role === "tool").map((message) => message.isError),
+    [false, true, true]);
+  assert.deepEqual((await Session.open(session.path)).messages, session.messages);
+  assert.equal(events.filter((event) => event.type === "tool_execution_end").length, 3);
+});
+
+test("cancellation during a tool stops the loop without storing a tool result", async () => {
+  const session = await Session.open(await temporarySession());
+  const controller = new AbortController();
+  let requests = 0;
+  const fakeFetch: typeof fetch = async () => {
+    requests++;
+    return response(JSON.stringify({ choices: [{ delta: { tool_calls: [{
+      index: 0, id: "cancel", function: { name: "cancel", arguments: "{}" },
+    }] } }] }), "[DONE]");
+  };
+  const registry = new ToolRegistry([{
+    name: "cancel", description: "cancel", parameters: { type: "object" },
+    execute: () => { controller.abort(); return "ignored"; },
+  }]);
+  await assert.rejects(async () => {
+    for await (const _event of runAgent(session, "取消", deepSeekProvider, {
+      apiKey: "secret", fetch: fakeFetch, signal: controller.signal,
+    }, registry)) { /* consume the run */ }
+  }, { name: "AbortError" });
+  assert.equal(requests, 1);
+  assert.deepEqual(session.messages.map((message) => message.role), ["user", "assistant"]);
 });
 
 test("caps a run at five model turns", async () => {

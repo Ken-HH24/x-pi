@@ -14,6 +14,7 @@ import {
   type ModelEvent,
   type ModelProvider,
   type StreamOptions,
+  isAbortError,
 } from "./stream.ts";
 
 type UpdateModelEvent = Exclude<ModelEvent, { type: "start" } | { type: "done" }>;
@@ -31,12 +32,7 @@ export type AgentEvent =
 
 /** 复制正在增长的模型消息，避免已发出的 Agent 事件随后被共享 partial 改写。 */
 function snapshot(message: AssistantMessage): AssistantMessage {
-  return {
-    role: "assistant",
-    content: message.content.map((block) => block.type === "text"
-      ? { ...block }
-      : { ...block, arguments: { ...block.arguments } }),
-  };
+  return structuredClone(message);
 }
 
 /**
@@ -50,6 +46,7 @@ export async function* runAgent(
   registry = new ToolRegistry([]),
 ): AsyncGenerator<AgentEvent, AssistantMessage> {
   const emittedMessages: Message[] = [];
+  options.signal?.throwIfAborted();
   yield { type: "agent_start" };
   yield { type: "turn_start" };
   const user = userMessage(prompt);
@@ -59,6 +56,7 @@ export async function* runAgent(
   yield { type: "message_end", message: user };
 
   for (let turn = 1; turn <= 5; turn++) {
+    options.signal?.throwIfAborted();
     if (turn > 1) yield { type: "turn_start" };
     const context = buildContext(session.records);
     const llmMessages = convertToLlm(context.messages);
@@ -73,7 +71,7 @@ export async function* runAgent(
         yield {
           type: "message_update",
           message: snapshot(modelEvent.partial),
-          modelEvent,
+          modelEvent: structuredClone(modelEvent),
         };
       } else {
         await session.append(modelEvent.message);
@@ -87,12 +85,14 @@ export async function* runAgent(
     const calls = assistant.content.filter((block) => block.type === "toolCall");
     const toolResults: ToolResultMessage[] = [];
     for (const toolCall of calls) {
-      if (toolCall.type !== "toolCall") continue;
+      options.signal?.throwIfAborted();
       yield { type: "tool_execution_start", toolCall };
       let result: ToolResultMessage;
       try {
-        result = await registry.execute(toolCall);
+        result = await registry.execute(toolCall, options.signal);
       } catch (error) {
+        options.signal?.throwIfAborted();
+        if (isAbortError(error) || error instanceof Error && error.name === "AbortError") throw error;
         result = {
           role: "tool",
           toolCallId: toolCall.id,
@@ -100,6 +100,7 @@ export async function* runAgent(
           isError: true,
         };
       }
+      options.signal?.throwIfAborted();
       yield { type: "tool_execution_end", toolCall, result };
       yield { type: "message_start", message: result };
       await session.append(result);

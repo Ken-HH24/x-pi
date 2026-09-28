@@ -3,7 +3,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Tool, ToolCallContent, ToolResultMessage } from "./messages.ts";
 
 export type RegisteredTool = Tool & {
-  execute(arguments_: Record<string, unknown>): Promise<string> | string;
+  execute(arguments_: Record<string, unknown>, signal?: AbortSignal): Promise<string> | string;
 };
 
 /** 校验本章使用的 JSON Schema 子集：type、properties、required 和 additionalProperties。 */
@@ -57,11 +57,13 @@ export class ToolRegistry {
   }
 
   /** 找到工具、验证参数并执行；失败由 Agent 转成模型可见的错误结果。 */
-  async execute(call: ToolCallContent): Promise<ToolResultMessage> {
+  async execute(call: ToolCallContent, signal?: AbortSignal): Promise<ToolResultMessage> {
+    signal?.throwIfAborted();
     const tool = this.byName.get(call.name);
     if (!tool) throw new Error(`Unknown tool: ${call.name}`);
     validateArguments(tool.parameters, call.arguments);
-    const content = await tool.execute(call.arguments);
+    const content = await tool.execute(call.arguments, signal);
+    signal?.throwIfAborted();
     return { role: "tool", toolCallId: call.id, content, isError: false };
   }
 }
@@ -77,8 +79,9 @@ export function createReadFileTool(workspace = process.cwd()): RegisteredTool {
       required: ["path"],
       additionalProperties: false,
     },
-    async execute(arguments_) {
+    async execute(arguments_, signal) {
       const input = arguments_.path as string;
+      if (!input.trim()) throw new Error("path must be non-empty");
       if (isAbsolute(input)) throw new Error("path must be relative to the workspace");
       const root = await realpath(workspace);
       const target = resolve(root, input);
@@ -87,7 +90,7 @@ export function createReadFileTool(workspace = process.cwd()): RegisteredTool {
       if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
         throw new Error("path escapes the workspace");
       }
-      return readFile(resolved, "utf8");
+      return readFile(resolved, { encoding: "utf8", signal });
     },
   };
 }
