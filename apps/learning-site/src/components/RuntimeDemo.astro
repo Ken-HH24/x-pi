@@ -125,6 +125,21 @@ const demos: Record<number, Demo> = {
       { title: "结束 Agent run", detail: "模型不再请求工具，最终文本完成后关闭 turn 与 run。", node: 0, output: "$ nano-pi \"读取 README.md 并概括项目\"\n[tool result] ok: # x-pi\n这是一个从零学习 Agent 的项目。\n", state: { events: ["message_end", "turn_end", "agent_end"], turns: 2, status: "done" }, file: "src/agent.ts", source: "yield { type: \"turn_end\", message: assistant, toolResults };\nif (calls.length === 0) {\n  yield { type: \"agent_end\", messages: emittedMessages };\n  return assistant;\n}" },
     ],
   },
+  9: {
+    title: "跟踪取消与显式恢复",
+    description: "一轮工具调用中断后，观察 JSONL 已提交状态如何决定恢复或放弃。",
+    nodes: ["CLI", "AbortSignal", "Agent", "Session", "ToolRegistry", "Model"],
+    steps: [
+      { title: "进入交互模式", detail: "无参数启动 readline，持续读取用户输入。", node: 0, output: "$ pnpm --filter @x-pi/lab-chapter-09 start\nnano-pi> 读取 A 和 B\n", state: { mode: "interactive", session: "/tmp/demo.jsonl", pending: false }, file: "src/main.ts", source: "terminal = createInterface({ input: process.stdin, output: process.stdout });\ninput = (await terminal.question(\"nano-pi> \")).trim();" },
+      { title: "提交工具调用", detail: "完整的 assistant tool call 已进入 Session。", node: 3, output: "nano-pi> 读取 A 和 B\n[tool call] read_file {\"path\":\"A\"}\n", state: { records: ["user", "assistant(call_a, call_b)"], pendingCalls: ["a", "b"] }, file: "src/agent.ts", source: "await session.append(modelEvent.message);\nconst calls = assistant.content.filter((block) => block.type === \"toolCall\");" },
+      { title: "完成首个工具", detail: "调用 a 的结果已提交，b 仍缺失。", node: 4, output: "[tool result] ok: A 的内容\n", state: { committedResults: ["a"], missingResults: ["b"] }, file: "src/agent.ts", source: "const result = await registry.execute(toolCall, options.signal);\nawait session.append(result);" },
+      { title: "按 Ctrl+C 取消", detail: "AbortSignal 停止本轮；未完成的工具结果不会提交。", node: 1, output: "^C\nCancelled\n存在未完成轮次：使用 /resume 继续，或 /discard 放弃。\n", state: { signal: "aborted", records: ["user", "assistant", "tool(a)"], partialCommitted: false }, file: "src/main.ts → src/agent.ts", source: "const onInterrupt = () => controller.abort();\noptions.signal?.throwIfAborted();" },
+      { title: "重启并识别待续", detail: "扫描 JSONL，得到本轮起点和已完成调用 id。", node: 3, output: "$ pnpm --filter @x-pi/lab-chapter-09 start\n存在未完成轮次：使用 /resume 继续，或 /discard 放弃。\nnano-pi> /resume\n", state: { from: 0, assistant: "call_a, call_b", completedCallIds: ["a"] }, file: "src/recovery.ts", source: "const pending = findPendingTurn(session.records);\n// tool result 的 toolCallId 加入 completedCallIds" },
+      { title: "只补缺失结果", detail: "跳过已有的 a，仅执行并保存 b，然后请求模型。", node: 2, output: "[tool result] ok: B 的内容\n", state: { skipped: ["a"], executed: ["b"], requestRoles: ["user", "assistant", "tool", "tool"] }, file: "src/agent.ts", source: "if (pending?.completedCallIds.has(toolCall.id)) continue;\nawait session.append(result);" },
+      { title: "结束恢复轮次", detail: "模型最终回答提交后，待续状态消失。", node: 5, output: "A 和 B 的内容已读取并整理。\nnano-pi> ", state: { finalAssistantCommitted: true, pending: false }, file: "src/agent.ts → src/recovery.ts", source: "await session.append(modelEvent.message);\n// 普通 assistant 使 findPendingTurn 返回 undefined" },
+      { title: "放弃下一次中断", detail: "下一轮若中断并选择 /discard，会写入标记并从后续 Context 排除该轮。", node: 3, output: "nano-pi> 新问题\n^C\nCancelled\nnano-pi> /discard\n已放弃未完成轮次。\n", state: { record: { type: "discard", from: 5 }, nextContextExcludes: "新问题" }, file: "src/session.ts → src/context.ts", source: "await session.discard(pending.from);\n// buildContext 跳过 from 到 discard 之间的 message" },
+    ],
+  },
 };
 
 const { order } = Astro.props as { order: number };
@@ -233,6 +248,10 @@ if (order > 0 && !demo) {
       "接收首个调用片段": "events.push", "开始内容块": "content.push",
       "累积参数片段": "rawArguments +=", "形成结构化调用": "JSON.parse",
       "提升 Agent 更新": "message_update", "提交完整消息": "session.append",
+      "进入交互模式": "createInterface", "提交工具调用": "session.append",
+      "完成首个工具": "registry.execute", "按 Ctrl+C 取消": "controller.abort",
+      "重启并识别待续": "findPendingTurn", "只补缺失结果": "completedCallIds",
+      "结束恢复轮次": "session.append", "放弃路径": "session.discard",
     };
     const stateKeys: Record<string, string[]> = {
       "准备输入": ["prompt"], "发送请求": ["method", "stream"], "缓冲网络分片": ["buffer", "completeEvent"],
@@ -256,6 +275,10 @@ if (order > 0 && !demo) {
       "接收首个调用片段": ["index", "id", "argumentsDelta"], "开始内容块": ["event", "providerIndex", "contentIndex"],
       "累积参数片段": ["delta", "rawArguments"], "形成结构化调用": ["event", "toolCall"],
       "提升 Agent 更新": ["event", "modelEvent", "executed"], "提交完整消息": ["assistantCommitted", "toolResults", "nextTurn"],
+      "进入交互模式": ["mode", "pending"], "提交工具调用": ["records", "pendingCalls"],
+      "完成首个工具": ["committedResults", "missingResults"], "按 Ctrl+C 取消": ["signal", "partialCommitted"],
+      "重启并识别待续": ["from", "completedCallIds"], "只补缺失结果": ["skipped", "executed"],
+      "结束恢复轮次": ["finalAssistantCommitted", "pending"], "放弃路径": ["record", "contextMessages"],
     };
     const escapeHtml = (value: string) => value
       .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");

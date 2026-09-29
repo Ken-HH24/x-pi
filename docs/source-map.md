@@ -1,6 +1,6 @@
 # Pi 源码学习地图
 
-更新时间：2026-09-20。
+更新时间：2026-09-29。
 
 本文件不是永久正确的架构说明，而是 `x-pi` 学习过程中持续校准的索引。Pi 主仓库变化很快；进入每个章节时仍需重新核对相关源码。
 
@@ -65,6 +65,10 @@ Nano Pi 实现 DeepSeek Chat Completions 的 function tool 子集：应用侧 `T
 ### Chapter 8：多轮工具循环
 
 Pi 当前 `packages/agent/src/types.ts` 定义 `tool_execution_start` / `tool_execution_end`，并将一个 turn 描述为 assistant 消息、工具调用与结果；`agent-loop.ts` 在工具调用后把 ToolResultMessage 加入 Context，再决定是否进入下一轮。Nano Pi 用 `ToolRegistry` 配对厂商声明和执行函数，内置常用 schema 子集校验，按序执行工具，保存 `{ role: "tool", toolCallId, content, isError }`，provider 转为 DeepSeek 的 `tool_call_id`。本教学版限 `read_file` 示例与五次模型请求，不含 Pi 的并行模式、审批 hook、更新事件或完整 JSON Schema。
+
+### Chapter 9：CLI、取消与恢复
+
+Pi 的 CLI 提供交互模式与恢复入口，`AgentSession.abort()` 会停止 Agent 并等待空闲；`packages/tui` 提供键盘事件和界面。Nano Pi 使用 Node readline 和固定 JSONL 文件：每轮独立的 AbortSignal 贯穿模型与工具；从完整消息推导待续轮次，显式 `/resume` 补齐缺失的模型或工具结果，`/discard` 标记放弃并从 Context 排除。它不实现 Pi 的完整 TUI、会话选择或 Session Tree。
 
 ### 模型消息与 Agent 消息分离
 

@@ -35,6 +35,8 @@ const runCommand = chapter.data.order === 4
   ? `X_PI_SESSION_FILE=/tmp/x-pi-demo.jsonl pnpm --filter @x-pi/lab-${chapter.data.lab} start -- "记住数字 42"\nsed -n '1,2p' /tmp/x-pi-demo.jsonl\nX_PI_SESSION_FILE=/tmp/x-pi-demo.jsonl pnpm --filter @x-pi/lab-${chapter.data.lab} start -- "我让你记住了什么？"`
   : chapter.data.order === 8
     ? `X_PI_SESSION_FILE=/tmp/x-pi-chapter-08.jsonl pnpm --filter @x-pi/lab-${chapter.data.lab} start -- "读取 README.md 并概括项目"`
+  : chapter.data.order === 9
+    ? `X_PI_SESSION_FILE=/tmp/x-pi-chapter-09.jsonl pnpm --filter @x-pi/lab-${chapter.data.lab} start\n# 交互中使用 /resume、/discard、/exit`
   : `pnpm --filter @x-pi/lab-${chapter.data.lab} start -- "你好"`;
 ---
 

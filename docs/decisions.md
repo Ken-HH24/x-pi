@@ -119,3 +119,9 @@ Chapter 7 中 provider 只产出按 index 标识的 tool call 原子增量，模
 状态：已接受。
 
 Chapter 8 的工具结果使用厂商无关的 tool Message，保留 `toolCallId`、文本结果与 `isError`；Provider 转换成 DeepSeek `role: "tool"` 与 `tool_call_id`。Agent 以注册表校验并按 assistant 内容顺序执行调用，工具错误也成为模型可见结果。教学版只覆盖常用 JSON Schema 子集，`read_file` 限于工作区真实路径，每次 run 最多发起五次模型请求。
+
+## D-021：中断轮次由已提交日志显式恢复或放弃
+
+状态：已接受。
+
+Chapter 9 不把运行中 partial 写入 Session。恢复器从完整 user、assistant tool call 和 tool result 推导待续工作；`/resume` 不重复提交 user 或已有结果，`/discard` 追加标记并使该轮退出后续 Context。CLI 在未完成轮次存在时阻止新问题，避免把不完整的工具调用带给模型。当前只有只读工具；工具执行后、结果提交前的崩溃窗口可重试，写入类工具引入前必须另定幂等边界。

@@ -56,7 +56,7 @@ docs/               进度、源码地图和设计决策
 
 ## 技术基线
 
-- Node.js 24（本机当前版本：`v24.18.1`）
+- Node.js 24（本机当前版本：`v24.19.0`）
 - TypeScript
 - pnpm 11
 - DeepSeek 作为第一个模型服务商
@@ -66,7 +66,7 @@ docs/               进度、源码地图和设计决策
 
 ## 当前进度
 
-当前完成 Chapter 8：Agent 可以校验并执行注册工具，把成功或失败结果交回模型，并继续多轮循环。
+当前完成 Chapter 9：命令行支持连续提问、取消当前轮次，并从已提交的 Session 状态显式恢复或放弃。
 
 新会话开始时，先阅读 [docs/progress.md](docs/progress.md)，再阅读当前章节文档。
 
@@ -85,7 +85,7 @@ docs/               进度、源码地图和设计决策
 | 06 | 最小 Agent Loop | 已完成 |
 | 07 | Tool Calling 协议 | 已完成 |
 | 08 | 多轮工具循环 | 已完成 |
-| 09 | CLI、取消与恢复 | 未开始 |
+| 09 | CLI、取消与恢复 | 已完成 |
 | 10 | Session Tree 与分支 | 未开始 |
 | 11 | Compaction | 未开始 |
 | 12 | Extension 与生命周期事件 | 未开始 |
@@ -98,6 +98,7 @@ pnpm check
 pnpm test
 pnpm typecheck
 pnpm --filter @x-pi/nano-pi start -- "你好"
+pnpm --filter @x-pi/nano-pi start
 pnpm docs:dev
 pnpm docs:build
 ```

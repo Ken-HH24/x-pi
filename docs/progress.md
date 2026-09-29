@@ -4,12 +4,12 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 09-cli-cancel-resume
+current_chapter: 10-session-tree
 status: ready
-last_completed: 08-tool-loop
-next_action: 学习 CLI 交互、取消传播和中断后的恢复行为
+last_completed: 09-cli-cancel-resume
+next_action: 学习 Session Tree 的父子记录、分支导航与活动路径 Context
 runtime:
-  node: 24.18.1
+  node: 24.19.0
   pnpm: 11.18.0
 decisions:
   - TypeScript + Node.js 24 + pnpm
@@ -17,6 +17,7 @@ decisions:
   - 教学快照与持续演进应用分开保存
   - 先完成 Nano Pi 核心，再展开 Harness
   - 每章包含关键代码解释、端到端例子和 Markdown 可见的 ASCII 图
+  - 中断轮次显式恢复或 discard，Context 排除放弃的消息
 ```
 
 ## 已完成
@@ -69,10 +70,14 @@ decisions:
 - [x] 建立工具注册、常用 JSON Schema 子集验证与工作区 read_file 执行边界。
 - [x] Agent 顺序执行工具、把错误回传模型并继续后续 turn；每次 run 限制五次模型请求。
 - [x] 添加 Chapter 8 离线测试、独立快照、完整教程与 Runtime Demo。
+- [x] 实现交互 CLI、Ctrl+C 取消及单次命令兼容。
+- [x] 从 Session 已提交记录识别待续轮次，显式恢复缺失的模型或工具步骤。
+- [x] 增加 discard 标记、Context 排除及崩溃尾行续写修复。
+- [x] 添加 Chapter 9 离线测试、独立快照、完整教程与 Runtime Demo。
 
 ## 下一步验收条件
 
-Chapter 9 继续围绕当前 CLI 实现取消传播和中断恢复，并补齐独立快照与学习演示。
+Chapter 10 将线性 JSONL Session 扩展为可导航的树形记录，同时保留 Chapter 9 的取消与恢复语义。
 
 
 ## 暂不处理
@@ -85,7 +90,7 @@ Chapter 9 继续围绕当前 CLI 实现取消传播和中断恢复，并补齐�
 下一位执行者应先检查工作树，然后阅读：
 
 1. `README.md`
-2. `chapters/07-tool-calling/README.md`
+2. `chapters/09-cli-cancel-resume/README.md`
 3. `docs/source-map.md`
 4. `docs/decisions.md`
 5. `docs/chapter-template.md`
