@@ -125,3 +125,9 @@ Chapter 8 的工具结果使用厂商无关的 tool Message，保留 `toolCallId
 状态：已接受。
 
 Chapter 9 不把运行中 partial 写入 Session。恢复器从完整 user、assistant tool call 和 tool result 推导待续工作；`/resume` 不重复提交 user 或已有结果，`/discard` 追加标记并使该轮退出后续 Context。CLI 在未完成轮次存在时阻止新问题，避免把不完整的工具调用带给模型。当前只有只读工具；工具执行后、结果提交前的崩溃窗口可重试，写入类工具引入前必须另定幂等边界。
+
+## D-022：Session 使用 append-only 树与 leaf 指针
+
+状态：已接受。
+
+Chapter 10 把 Session 从线性数组升级为 append-only 树：首行是 v3 header，entry 通过 `id`/`parentId` 链接，`leafId` 指针记录当前位置。`branch()`/`resetLeaf()` 只移动指针、不修改历史；Context 与 `findPendingTurn` 都沿活动分支（leaf→root）构建。`discard` 从数组下标改为 `targetId` 定位，旧线性文件打开时自动迁移为 v3。分支摘要、compaction 等 entry 类型仍留给后续章节。

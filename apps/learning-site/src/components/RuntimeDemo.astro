@@ -140,6 +140,21 @@ const demos: Record<number, Demo> = {
       { title: "放弃下一次中断", detail: "下一轮若中断并选择 /discard，会写入标记并从后续 Context 排除该轮。", node: 3, output: "nano-pi> 新问题\n^C\nCancelled\nnano-pi> /discard\n已放弃未完成轮次。\n", state: { record: { type: "discard", from: 5 }, nextContextExcludes: "新问题" }, file: "src/session.ts → src/context.ts", source: "await session.discard(pending.from);\n// buildContext 跳过 from 到 discard 之间的 message" },
     ],
   },
+  10: {
+    title: "观察 Session 树如何分支",
+    description: "回退到历史 entry 后另起问题，Context 只沿当前叶子到根的路径构建。",
+    nodes: ["CLI", "Session", "Tree", "Context", "Model"],
+    steps: [
+      { title: "打开并迁移旧文件", detail: "旧线性文件没有 header，打开时自动补 header、id/parentId 并重写。", node: 1, output: "$ pnpm --filter @x-pi/lab-chapter-10 start\nnano-pi> /tree\n", state: { header: { type: "session", version: 3 }, migrated: true }, file: "src/session.ts", source: "const first = asRecord(values[0]!.value, values[0]!.line);\nif (first.type !== \"session\") {\n  const { header, entries } = migrateLegacy(legacy, process.cwd());\n  await writeFile(path, serialize(header, entries), \"utf8\");\n}" },
+      { title: "追加主干", detail: "每条 entry 都是当前 leaf 的子节点，并推进 leaf。", node: 1, output: "nano-pi> 主干问题\n主干回答\n", state: { entries: ["1a:user", "2b:assistant"], leaf: "2b" }, file: "src/session.ts", source: "const entry: MessageEntry = {\n  type: \"message\",\n  id: generateId(this.byId),\n  parentId: this.leafId,\n  timestamp: new Date().toISOString(),\n  message,\n};\nawait this.appendEntry(entry);\nthis.leafId = entry.id;" },
+      { title: "查看树", detail: "/tree 用 * 标出当前叶子，打印 id、角色与文本预览。", node: 2, output: "nano-pi> /tree\nsession 5f3a (leaf: 2b)\n   1a  user: 主干问题\n      * 2b  assistant: 主干回答\n", state: { tree: ["1a", "2b"], leaf: "2b" }, file: "src/main.ts", source: "const marker = node.entry.id === session.getLeafId() ? \"*\" : \" \";\nprocess.stdout.write(`${indent}${marker} ${node.entry.id}  ${describe(node.entry)}\\n`);" },
+      { title: "回到历史节点", detail: "/branch 只移动 leaf 指针，不删除任何已提交记录。", node: 2, output: "nano-pi> /branch 1a\n已分支到 1a。\n", state: { leaf: "1a", historyKept: ["1a", "2b"] }, file: "src/session.ts", source: "branch(branchFromId: string): void {\n  if (!this.byId.has(branchFromId)) throw new Error(`Entry ${branchFromId} not found`);\n  this.leafId = branchFromId;\n}" },
+      { title: "另起分支", detail: "新问题成为 1a 的第二个孩子，与 2b 并列。", node: 1, output: "nano-pi> 分支问题\n分支回答\n", state: { newEntries: ["3c:user", "4d:assistant"], parentId: "1a", leaf: "4d" }, file: "src/session.ts", source: "// appendMessage 的 parentId 是当前 leaf，因此新 entry 挂在 1a 下\nawait session.appendMessage(userMessage(input));" },
+      { title: "沿活动分支构建 Context", detail: "getBranch 从 4d 走到根再反转，只收集这条路径的消息。", node: 3, output: "nano-pi> /leaf\n当前 leaf: 4d\n", state: { branch: ["1a", "3c", "4d"], excluded: ["2b"] }, file: "src/context.ts", source: "const branch = session.getBranch();\nreturn {\n  messages: branch.flatMap((entry) =>\n    entry.type === \"message\" && !excluded.has(entry.id) ? [entry.message] : []\n  ),\n};" },
+      { title: "发送模型 Context", detail: "模型只看到 1a、3c、4d；2b 属于另一条分支，不进入请求。", node: 4, output: "分支回答\nnano-pi> ", state: { requestMessages: ["1a", "3c", "4d"], otherBranch: ["2b"] }, file: "src/agent.ts", source: "const context = buildContext(session);\nconst llmMessages = convertToLlm(context.messages);\nstreamModel(llmMessages, provider, options);" },
+      { title: "重置到根之前", detail: "/reset 把 leaf 置为 null，下一条消息成为新的根。", node: 2, output: "nano-pi> /reset\n已重置到根之前。\n", state: { leaf: null, nextAppendIsRoot: true }, file: "src/session.ts", source: "resetLeaf(): void {\n  this.leafId = null;\n}" },
+    ],
+  },
 };
 
 const { order } = Astro.props as { order: number };

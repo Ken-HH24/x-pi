@@ -37,6 +37,8 @@ const runCommand = chapter.data.order === 4
     ? `X_PI_SESSION_FILE=/tmp/x-pi-chapter-08.jsonl pnpm --filter @x-pi/lab-${chapter.data.lab} start -- "读取 README.md 并概括项目"`
   : chapter.data.order === 9
     ? `X_PI_SESSION_FILE=/tmp/x-pi-chapter-09.jsonl pnpm --filter @x-pi/lab-${chapter.data.lab} start\n# 交互中使用 /resume、/discard、/exit`
+  : chapter.data.order === 10
+    ? `X_PI_SESSION_FILE=/tmp/x-pi-chapter-10.jsonl pnpm --filter @x-pi/lab-${chapter.data.lab} start\n# 交互中输入问题后使用 /tree、/branch <id>、/reset、/leaf`
   : `pnpm --filter @x-pi/lab-${chapter.data.lab} start -- "你好"`;
 ---
 

@@ -70,6 +70,10 @@ Pi 当前 `packages/agent/src/types.ts` 定义 `tool_execution_start` / `tool_ex
 
 Pi 的 CLI 提供交互模式与恢复入口，`AgentSession.abort()` 会停止 Agent 并等待空闲；`packages/tui` 提供键盘事件和界面。Nano Pi 使用 Node readline 和固定 JSONL 文件：每轮独立的 AbortSignal 贯穿模型与工具；从完整消息推导待续轮次，显式 `/resume` 补齐缺失的模型或工具结果，`/discard` 标记放弃并从 Context 排除。它不实现 Pi 的完整 TUI、会话选择或 Session Tree。
 
+### Chapter 10：Session Tree 与分支
+
+Pi 的 `SessionManager` 维护 `leafId` 指针；`appendMessage()` 生成 8 位 hex `id` 并作为当前 leaf 的子节点追加；`branch()` / `resetLeaf()` 只移动 leaf，`getBranch()` 从 leaf 走到根再反转；`buildContextEntries()` 沿该路径选择，v1→v2 迁移为 entry 补 id/parentId 并重写文件。Nano Pi 实现同一子集：v3 header、`id`/`parentId`、`leafId`、`getBranch`/`getTree`、`branch`/`resetLeaf`，打开旧线性文件时迁移为 v3；`discard` 保留 Chapter 9 语义但改为 `targetId` 定位，Context 与 `findPendingTurn` 都只沿活动分支。分支摘要（`branch_summary`）、compaction、label 等 entry 仍留到后续章节。
+
 ### 模型消息与 Agent 消息分离
 
 Pi Agent 允许应用自定义 `AgentMessage`，但调用模型前必须经过 `transformContext()` 和 `convertToLlm()`，最终只发送模型理解的消息。Nano Pi 会先从少量消息类型开始，但保留“存储/应用消息不等于 provider 请求格式”这一边界。
@@ -84,7 +88,7 @@ Pi Agent 允许应用自定义 `AgentMessage`，但调用模型前必须经过 `
 
 ### Session 是树，不只是聊天数组
 
-Pi 文档明确说明 Session 使用 JSONL，并以树结构保存分支。Nano Pi 会先学习追加日志，再引入 parent 指针、分支导航和 compaction，避免第一章就承担完整复杂度。
+Pi 文档明确说明 Session 使用 JSONL，并以树结构保存分支。Nano Pi 已在 Chapter 4 学习追加日志、Chapter 10 引入 parent 指针与分支导航，compaction 将在 Chapter 11 引入。
 
 ### Harness 需要自己定义安全边界
 

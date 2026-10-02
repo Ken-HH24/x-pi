@@ -66,7 +66,7 @@ docs/               进度、源码地图和设计决策
 
 ## 当前进度
 
-当前完成 Chapter 9：命令行支持连续提问、取消当前轮次，并从已提交的 Session 状态显式恢复或放弃。
+当前完成 Chapter 10：Session 由线性 JSONL 升级为带 header、id/parentId 和 leaf 指针的树，支持分支导航与旧文件迁移。
 
 新会话开始时，先阅读 [docs/progress.md](docs/progress.md)，再阅读当前章节文档。
 
@@ -86,7 +86,7 @@ docs/               进度、源码地图和设计决策
 | 07 | Tool Calling 协议 | 已完成 |
 | 08 | 多轮工具循环 | 已完成 |
 | 09 | CLI、取消与恢复 | 已完成 |
-| 10 | Session Tree 与分支 | 未开始 |
+| 10 | Session Tree 与分支 | 已完成 |
 | 11 | Compaction | 未开始 |
 | 12 | Extension 与生命周期事件 | 未开始 |
 | 13 | 对照 Pi 源码复盘 | 未开始 |

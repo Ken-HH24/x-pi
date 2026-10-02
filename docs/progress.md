@@ -4,10 +4,10 @@
 
 ```yaml
 current_milestone: nano-pi
-current_chapter: 10-session-tree
+current_chapter: 11-compaction
 status: ready
-last_completed: 09-cli-cancel-resume
-next_action: 学习 Session Tree 的父子记录、分支导航与活动路径 Context
+last_completed: 10-session-tree
+next_action: 学习 compaction 与分支摘要，把旧消息压缩为摘要并保留分支路径
 runtime:
   node: 24.19.0
   pnpm: 11.18.0
@@ -18,6 +18,7 @@ decisions:
   - 先完成 Nano Pi 核心，再展开 Harness
   - 每章包含关键代码解释、端到端例子和 Markdown 可见的 ASCII 图
   - 中断轮次显式恢复或 discard，Context 排除放弃的消息
+  - Session 使用 append-only 树、leaf 指针与活动分支 Context
 ```
 
 ## 已完成
@@ -74,10 +75,14 @@ decisions:
 - [x] 从 Session 已提交记录识别待续轮次，显式恢复缺失的模型或工具步骤。
 - [x] 增加 discard 标记、Context 排除及崩溃尾行续写修复。
 - [x] 添加 Chapter 9 离线测试、独立快照、完整教程与 Runtime Demo。
+- [x] 引入 Session v3 header、entry id/parentId 与 leaf 指针。
+- [x] 实现 branch/resetLeaf/getBranch/getTree 导航，Context 只沿活动分支构建。
+- [x] 打开旧线性 Session 时自动迁移为 v3 树，discard 改为 targetId 定位。
+- [x] 添加 Chapter 10 离线测试、独立快照、完整教程与 Runtime Demo。
 
 ## 下一步验收条件
 
-Chapter 10 将线性 JSONL Session 扩展为可导航的树形记录，同时保留 Chapter 9 的取消与恢复语义。
+Chapter 11 在树形 Session 上引入 Compaction，把旧消息压缩为摘要并保留分支路径。
 
 
 ## 暂不处理
@@ -90,7 +95,7 @@ Chapter 10 将线性 JSONL Session 扩展为可导航的树形记录，同时保
 下一位执行者应先检查工作树，然后阅读：
 
 1. `README.md`
-2. `chapters/09-cli-cancel-resume/README.md`
+2. `chapters/10-session-tree/README.md`
 3. `docs/source-map.md`
 4. `docs/decisions.md`
 5. `docs/chapter-template.md`
